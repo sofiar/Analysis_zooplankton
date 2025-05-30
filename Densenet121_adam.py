@@ -1,7 +1,10 @@
+################################################################################
+#  script to train and test Desnet121 with adam optimizer to zooplankton data  #
+################################################################################
+
 import torch
 import numpy as np
 from modular import engine
-from joblib import dump
 from torch.utils.data import DataLoader, random_split, SequentialSampler
 from joblib import Parallel, delayed
 import torchvision.models as models
@@ -13,34 +16,34 @@ import samples_setup
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Set device
-#print(torch.cuda.get_device_name(0)) 
+print(torch.cuda.get_device_name(0)) 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Set paths 
-FilePath = '/home/sofia/Candu_postdoc/zooplankton/Data/processed_data'
+# # Set paths 
+FilePath = '/data/zooplankton_data'
 print('Data file path: ', FilePath)
 
-WeightsPath = '/home/sofia/Downloads'
-print('Weights file path: ', FilePath)
+WeightsPath = '/data/zooplankton_data'
+print('Weights file path: ', WeightsPath)
 
-ResultsPath = '/home/sofia/Downloads'
-print('Results file path: ', FilePath)
+ResultsPath = '/home/ruizsuar/Environments'
+print('Results file path: ', ResultsPath)
 
-PredictionsPath = '/home/sofia/Downloads'
-print('Results file path: ', FilePath)
+PredictionsPath = '/home/ruizsuar/Predictions'
+print('Results file path: ', PredictionsPath)
 
 
 # Define classes to include in the model
 # all_classes = ['Bosmina_1','Bubbles','Calanoid_1','Chironomid','Chydoridae',
 #                'Cyclopoid_1','Daphnia','Floc_1','Herpacticoida',
 #                'LargeZ-1','Nauplii','TooSmall']
-all_classes = ['Bosmina_1','Bubbles','Calanoid_1']
+all_classes = ['Daphnia','Calanoid_1','Cyclopoid_1']
 
 
-################################################################################
-################################# Get data #####################################
-################################################################################
+# ################################################################################
+# ################################# Get data #####################################
+# ################################################################################
 
 RESOLUTION = 64
 MAXVALUE = 50
@@ -68,9 +71,9 @@ for cl in name_classes:
     length_classes.append(len(only_class))
     print(f"Samples of {cl}: {len(only_class)}")
 
-################################################################################
-################## Define train test and validation sets #######################
-################################################################################
+# ################################################################################
+# ################## Define train test and validation sets #######################
+# ################################################################################
 
 BATCH_SIZE = 80
 
@@ -102,9 +105,9 @@ test_loader = DataLoader(test_dataset, batch_size = BATCH_SIZE,
                          sampler = SequentialSampler(test_dataset))
 val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle=True)
 
-################################################################################
-###################### Densenet121 - Adam optimizer ############################
-################################################################################
+# ################################################################################
+# ###################### Densenet121 - Adam optimizer ############################
+# ################################################################################
 
 EPOCHS = 5 
 
@@ -133,12 +136,15 @@ print("Starting Densenet121 Inference!")
 early_stop = engine.EarlyStopping(patience=10, delta=0.005)
 
 start = time.time()
-output_dn = engine.train_test_loop(model_dn,train_loader,
-                                val_loader, optimizer, loss_fn,
-                                epochs = EPOCHS, print_b = True,
-                                early_stopping = early_stop,
-                                Scheduler = scheduler,
-                                device = device)
+output_dn = engine.train_test_loop(
+    model_dn,train_loader,
+    val_loader, optimizer, loss_fn,
+    epochs = EPOCHS, print_b = True,
+    early_stopping = early_stop,
+    Scheduler = scheduler,
+    device = device
+    )
+
 end = time.time()
 elapsed = end - start
 
@@ -167,10 +173,11 @@ print('Environrment saved in: '+ where_to_save)
 # Save predicted labels 
 
 model_dn.eval() 
-outputs = Parallel(n_jobs=1)(delayed(samples_setup.get_predictions)(model=model_dn,
-                                                        image=imag.to(device),
-                                                        label=target)
-                    for imag, target in test_loader)
+outputs = Parallel(n_jobs=10)(delayed(samples_setup.get_predictions)(
+    model=model_dn,
+    image=imag.to(device),
+    label=target
+    ) for imag, target in test_loader)
 
 print('predictions calculated!')
 
@@ -193,261 +200,3 @@ del model_dn
 del output_dn
 
 
-# ########################### Densenet121 - SGD optimizer #######################
-                            
-# model_dn2 = models.densenet121(weights=None)
-# model_keys = set(model_dn2.state_dict().keys())
-
-# # load weights
-# weights_path =  "/home/sofiruiz/Zooplankton/densenet121-a639ec97.pth"
-# # send weights to gpu
-# state_dict =  torch.load(weights_path,map_location='cpu')
-# weight_keys = set(state_dict.keys())
-
-# # load weights into model
-# model_dn2.load_state_dict(state_dict,strict =False)
-# model_dn2.to(device)
-
-# model_dn2.classifier = torch.nn.Linear(model_dn2.classifier.in_features, 
-#                                       len(all_classes))
-
-# loss_fn = torch.nn.CrossEntropyLoss()
-
-# if weighted:
-#     loss_fn = custom_weighted_loss
-    
-# optimizer = torch.optim.SGD(params=model_dn2.parameters(), lr=1e-3) 
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-
-
-# print("Starting Densenet121 -SGD Inference!")
-
-# early_stop = engine.EarlyStopping(patience=10, delta=0.005)
-
-# start = time.time()
-# output_dn2 = engine.train_test_loop(model_dn2,train_loader,
-#                                 val_loader, optimizer, loss_fn,
-#                                 epochs = EPOCHS, print_b = True,
-#                                 early_stopping = early_stop,
-#                                 Scheduler = scheduler,
-#                                 device = device)
-# end = time.time()
-# elapsed = end - start
-
-# print(f"It took: {elapsed} secs to run")
-
-
-# # Save environment
-
-# variables_to_save = {
-#     'output_dn2': output_dn2,
-#     'model_dn2': model_dn2,
-#     'EPOCHS': EPOCHS,
-#     #'train_loader': train_loader,
-#     'test_loader': test_loader,
-#     'all_classes': all_classes,
-#     #'val_loader': val_loader,
-#     'dataset':all_datasets,
-#     'classes_keys': classes_keys,
-#     'elapsed_time': elapsed,
-#     #'train_labels': train_labels
-    
-# }
-
-# where_to_save = '/home/sofiruiz/Zooplankton/Environments/'+name+'Env_result_Denset121_sgd.pth'
-# torch.save(variables_to_save, where_to_save)
-# print('Environrment saved in: '+ where_to_save)  
-
-# model_dn2.eval() 
-# outputs = Parallel(n_jobs=1)(delayed(samples_setup.get_predictions)(model=model_dn2,
-#                                                         image=imag.to(device),
-#                                                         label=target)
-#                     for imag, target in test_loader)
-
-# print('predictions calculated!')
-
-# true_labels = []
-# predict_labels = []
-
-# for true, pred in outputs:
-#     true_labels.append(true)
-#     predict_labels.append(pred)
-    
-# true_labels = torch.cat(true_labels)
-# predict_labels = torch.cat(predict_labels)    
-
-# where_to_save = '/home/sofiruiz/Zooplankton/Predictions/'+name+'Pred_result_Denset121_sgd.pth'
-# torch.save((true_labels, predict_labels), where_to_save)
-  
-# del model_dn2  
-# del output_dn2
-
-# ########################### Resnet50 - Adam optimizer ##########################
-
-# model_resnet = models.resnet50(weights= None)
-# model_keys = set(model_resnet.state_dict().keys())
-
-# # load weights resnet
-# weights_path =  "/home/sofiruiz/Zooplankton/resnet50-0676ba61.pth"
-# # send weights to gpu
-# state_dict =  torch.load(weights_path,map_location='cpu')
-# weight_keys = set(state_dict.keys())
-
-# # load weights into model
-# model_resnet.load_state_dict(state_dict,strict =False)
-# model_resnet.to(device)
-
-# # Replace the final fully connected layer to account number of labels
-# model_resnet.fc = torch.nn.Linear(model_resnet.fc.in_features, len(all_classes))
-# loss_fn = torch.nn.CrossEntropyLoss()
-
-# if weighted:
-#     loss_fn = custom_weighted_loss
-
-# optimizer = torch.optim.Adam(params=model_resnet.parameters(), lr=1e-3) 
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-
-# print("Starting Resnet50 Inference!")
-
-# early_stop = engine.EarlyStopping(patience=10, delta=0.005)
-
-# start = time.time()
-# output_resnet = engine.train_test_loop(model_resnet,train_loader,
-#                                 val_loader, optimizer, loss_fn,
-#                                 epochs = EPOCHS, print_b = True,
-#                                 early_stopping = early_stop,
-#                                 Scheduler = scheduler,
-#                                 device=device)
-# end = time.time()
-# elapsed = end - start
-# print(f"It took: {elapsed} secs to run")
-
-# # Save environment
-
-# variables_to_save = {
-#     'output_resnet': output_resnet,
-#     'model_resnet': model_resnet,
-#     'EPOCHS': EPOCHS,
-#     #'train_loader': train_loader,
-#     'test_loader': test_loader,
-#     'all_classes': all_classes,
-#     #'val_loader': val_loader,
-#     'dataset':all_datasets,
-#     'classes_keys': classes_keys,
-#     'elapsed_time': elapsed    
-# }
-
-# where_to_save = '/home/sofiruiz/Zooplankton/Environments/'+ name+'Env_result_Resnet50_adam.pth'
-# torch.save(variables_to_save, where_to_save)
-# print('Environrment saved in: '+ where_to_save)    
-
-# model_resnet.eval() 
-# outputs = Parallel(n_jobs=1)(delayed(samples_setup.get_predictions)(model=model_resnet,
-#                                                         image=imag.to(device),
-#                                                         label=target)
-#                     for imag, target in test_loader)
-
-# print('predictions calculated!')
-
-# true_labels = []
-# predict_labels = []
-
-# for true, pred in outputs:
-#     true_labels.append(true)
-#     predict_labels.append(pred)
-    
-# true_labels = torch.cat(true_labels)
-# predict_labels = torch.cat(predict_labels)    
-
-# where_to_save = '/home/sofiruiz/Zooplankton/Predictions/'+ name+'Pred_result_Resnet50_adam.pth'
-# torch.save((true_labels, predict_labels), where_to_save)
-
-# del model_resnet  
-# del output_resnet
-
-# ########################### Resnet50 - SGD optimizer ###########################
-
-# model_resnet = models.resnet50(weights= None)
-# model_keys = set(model_resnet.state_dict().keys())
-
-# # load weights resnet
-# weights_path =  "/home/sofiruiz/Zooplankton/resnet50-0676ba61.pth"
-# # send weights to gpu
-# state_dict =  torch.load(weights_path,map_location='cpu')
-# weight_keys = set(state_dict.keys())
-
-# # load weights into model
-# model_resnet.load_state_dict(state_dict,strict =False)
-# model_resnet.to(device)
-
-# # Replace the final fully connected layer to account number of labels
-# model_resnet.fc = torch.nn.Linear(model_resnet.fc.in_features, len(all_classes))
-# loss_fn = torch.nn.CrossEntropyLoss()
-# if weighted:
-#     loss_fn = custom_weighted_loss
-    
-# optimizer = torch.optim.SGD(params=model_resnet.parameters(), lr=1e-3) 
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-
-# print("Starting Resnet50 Inference!")
-
-# early_stop = engine.EarlyStopping(patience=10, delta=0.005)
-
-# start = time.time()
-# output_resnet = engine.train_test_loop(model_resnet,train_loader,
-#                                 val_loader, optimizer, loss_fn,
-#                                 epochs = EPOCHS, print_b = True,
-#                                 early_stopping = early_stop,
-#                                 Scheduler = scheduler,
-#                                 device=device)
-# end = time.time()
-# elapsed = end - start
-# print(f"It took: {elapsed} secs to run")
-
-# # Save environment
-
-# variables_to_save = {
-#     'output_resnet': output_resnet,
-#     'model_resnet': model_resnet,
-#     'EPOCHS': EPOCHS,
-#     #'train_loader': train_loader,
-#     'test_loader': test_loader,
-#     'all_classes': all_classes,
-#     #'val_loader': val_loader,
-#     'dataset':all_datasets,
-#     'classes_keys': classes_keys,
-#     'elapsed_time': elapsed   
-# }
-
-
-
-# where_to_save = '/home/sofiruiz/Zooplankton/Environments/'+name+'Env_result_Resnet50_SGD.pth'
-# torch.save(variables_to_save, where_to_save)
-# print('Environrment saved in: '+ where_to_save)    
-
-# # Predictions
-
-# model_resnet.eval() 
-# outputs = Parallel(n_jobs=1)(delayed(samples_setup.get_predictions)(model=model_resnet,
-#                                                         image=imag.to(device),
-#                                                         label=target)
-#                     for imag, target in test_loader)
-
-# print('predictions calculated!')
-
-
-# true_labels = []
-# predict_labels = []
-
-# for true, pred in outputs:
-#     true_labels.append(true)
-#     predict_labels.append(pred)
-    
-# true_labels = torch.cat(true_labels)
-# predict_labels = torch.cat(predict_labels)    
-
-# where_to_save = '/home/sofiruiz/Zooplankton/Predictions/' +name+'Pred_result_Resnet50_sgd.pth'
-# torch.save((true_labels, predict_labels), where_to_save)
-
-# del model_resnet  
-# del output_resnet
