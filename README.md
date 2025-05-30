@@ -12,4 +12,8 @@ The dataset was provided by the Ministry of Natural Resources and Forestry(MNR),
 
 ## Set up
  1. Create python environment 
- 2. Install needed packages
+ 2. Install InformedML-CV by : 
+
+</pre> ```bash # Install InformedML-cv 
+pip install git+https://github.com/sofiar/InformedML-CV.git``` </pre>
+
