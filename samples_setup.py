@@ -14,8 +14,9 @@ import torch.nn.functional as F
 
 
 class ImageDataset(Dataset):
-    def __init__(self, folder_path,  transform=None,name_classes=None,
-                 resolution: int = 28,num_files: int = 10000,n_files=None):
+    def __init__(self, folder_path,  transform = None, name_classes = None,
+                 resolution: int = 28,num_files: int = 10000, n_files = None,
+                 seed = 999):
         """
         Args:
             folder_path (str): Path to the dataset folder where subdirectories are class names.
@@ -46,15 +47,17 @@ class ImageDataset(Dataset):
         for class_name in name_classes:#os.listdir(folder_path):
             class_path = os.path.join(folder_path, class_name)
             if os.path.isdir(class_path):  # Only consider directories
-                count = 0
-                for image_name in os.listdir(class_path):
+                all_files = os.listdir(class_path)
+                sample_size = min(num_files, len(all_files))
+                dict_n_files[class_name] = sample_size
+                # choose files randomly
+                random.seed(seed)
+                sample_files = random.sample(all_files, sample_size)
+                for image_name in sample_files:
                     if image_name.lower().endswith('.tif'):  # Only load .tif files
                         self.image_files.append(os.path.join(class_path, image_name))
                         self.labels.append(class_name)
-                        count += 1
-                        if count >= dict_n_files[class_name]:
-                            break  # Stop after loading N files  
-
+                     
         # Create a mapping of class names to integer indices
         self.class_to_idx = {class_name: idx for idx, class_name in enumerate(sorted(set(self.labels)))}
         self.labels = [self.class_to_idx[label] for label in self.labels]  # Convert labels to integers
@@ -167,317 +170,7 @@ class ImageDatasetHierarchical(Dataset):
 
         return image,  main_label, sub_label
     
-
-class ImageDatasetFree(Dataset):
-    def __init__(self, folder_path, name_files, transform=None,
-                 resolution: int = 28):
-        """
-        Args:
-            folder_path (str): Path to the dataset folder where subdirectories are class names.
-            transform (callable, optional): Optional transformations to apply to the images.
-            resolution: resolution to transform images.             
-        """
         
-        self.folder_path = folder_path
-        self.transform = transform
-        self.resolution = resolution
-
-        # Initialize image file paths and corresponding labels
-        self.image_files = []
-        self.labels = []
-        
-        # Load all image paths and their class names
-        for file in name_files:
-            image_path = os.path.join(folder_path, file)
-            class_name = file.split('/')[0]
-            self.image_files.append(image_path)
-            self.labels.append(class_name)
-                           
-
-        # Create a mapping of class names to integer indices
-        self.class_to_idx = {class_name: idx for idx, class_name in enumerate(sorted(set(self.labels)))}
-        self.labels = [self.class_to_idx[label] for label in self.labels]  # Convert labels to integers
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        # Load image
-        img_path = self.image_files[idx]
-        image = Image.open(img_path)
-
-        # Apply transformations if provided
-        if self.transform:
-            image = self.transform(image)
-
-        # Get label
-        label = self.labels[idx]
-
-        # Convert label to a tensor
-        label = torch.tensor(label, dtype=torch.long)
-
-        return image, label
-
-class ImageSoftDataset(Dataset):
-    def __init__(self, folder_path, transform=None,name_classes=None,
-                 resolution: int = 28,num_files: int = 10000):
-        """
-        Args:
-            folder_path (str): Path to the dataset folder where subdirectories are class names.
-            transform (callable, optional): Optional transformations to apply to the images.
-            name_classes (callable, optional): Labels names.
-            resolution: resolution to transform images.             
-        """
-        
-        self.folder_path = folder_path
-        self.transform = transform
-        self.name_classes = name_classes
-        self.resolution = resolution
-
-        # Initialize image file paths and corresponding labels
-        self.image_files = []
-        self.labels = []
-        
-        if self.name_classes is None:
-            name_classes = os.listdir(folder_path)
-            
-        # Remove CopepodSpp from Classes dictionary
-        self.class_to_idx = {
-            class_name: idx for idx, class_name in enumerate(self.name_classes) if class_name != 'CopepodSpp'
-            }    
-
-        # Load all image paths and their class names
-        for class_name in name_classes:#os.listdir(folder_path):
-            class_path = os.path.join(folder_path, class_name)
-            if os.path.isdir(class_path):  # Only consider directories
-                count = 0
-                for image_name in os.listdir(class_path):
-                    if image_name.lower().endswith('.tif'):  # Only load .tif files
-                        self.image_files.append(os.path.join(class_path, image_name))
-                        # Default one-hot encoding
-                        label_vector = np.zeros(len(self.name_classes), dtype=np.float32)
-                        
-                        if class_name == "CopepodSpp":
-                            # Assign 1/3 probability to class Calanoid, cyclopoid and Herpacticoida
-                            label_vector[self.class_to_idx["Calanoid_1"]] = 1/3
-                            label_vector[self.class_to_idx["Cyclopoid_1"]] = 1/3
-                            label_vector[self.class_to_idx["Herpacticoida"]] = 1/3
-                            
-                        else:
-                            # Hard label (probability 1)
-                            label_vector[self.class_to_idx[class_name]] = 1.0
-                        self.labels.append(label_vector)
-                                          
-                        #self.labels.append(class_name)
-                        count += 1
-                        if count >= num_files:
-                            break  # Stop after loading N files  
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        # Load image
-        img_path = self.image_files[idx]
-        image = Image.open(img_path)
-
-        # Apply transformations if provided
-        if self.transform:
-            image = self.transform(image)
-
-         # Convert label to a tensor
-        soft_label = torch.tensor(self.labels[idx], dtype=torch.float32)  # Soft label (probability distribution)
-
-        return image, soft_label
-    
-class ImageDatasetSoftFree(Dataset):
-    def __init__(self, folder_path,dict_classes, name_files, transform=None,
-                 resolution: int = 28):
-        """
-        Args:
-            folder_path (str): Path to the dataset folder where subdirectories are class names.
-            transform (callable, optional): Optional transformations to apply to the images.
-            resolution: resolution to transform images.             
-        """
-        
-        self.folder_path = folder_path
-        self.transform = transform
-        self.resolution = resolution
-        
-        # Remove CopepodSpp from Classes dictionary
-        self.class_to_idx = dict_classes
-
-        class_names = list(dict_classes.keys())
-        self.name_classes = class_names
-
-        # Initialize image file paths and corresponding labels
-        self.image_files = []
-        self.labels = []
-        
-        # Load all image paths and their class names
-        for file in name_files:
-            image_path = os.path.join(folder_path, file)
-            category_name = file.split('/')[0]
-            self.image_files.append(image_path)
-            # Default one-hot encoding
-            label_vector = np.zeros(len(self.name_classes)+1, dtype=np.float32) # To account for CopepodSpp
-            
-            if category_name == "CopepodSpp":
-                # Assign 1/3 probability to class Calanoid, cyclopoid and Herpacticoida
-                label_vector[self.class_to_idx["Calanoid_1"]] = 1/3
-                label_vector[self.class_to_idx["Cyclopoid_1"]] = 1/3
-                label_vector[self.class_to_idx["Herpacticoida"]] = 1/3
-                
-            else:
-                # Hard label (probability 1)
-                label_vector[self.class_to_idx[category_name]] = 1.0
-            self.labels.append(label_vector)
-            
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        # Load image
-        img_path = self.image_files[idx]
-        image = Image.open(img_path)
-
-        # Apply transformations if provided
-        if self.transform:
-            image = self.transform(image)
-
-        # Get label
-        label = self.labels[idx]
-
-        # Convert label to a tensor
-        label = torch.tensor(label,dtype=torch.float32)
-
-        return image, label    
-            
-        
-        
-class TarImageDataset(Dataset):
-    def __init__(self, folder_path,  transform=None,name_classes=None,
-                 resolution: int = 28):
-        """
-        Args:
-            folder_path (str): Path to the dataset folder where subdirectories are class names.
-            transform (callable, optional): Optional transformations to apply to the images.
-            name_classes (callable, optional): Labels names.
-            resolution: resolution to transform images.             
-        """
-        
-        self.folder_path = folder_path
-        self.transform = transform
-        self.name_classes = name_classes
-        self.resolution = resolution
-
-        # Initialize image file paths and corresponding labels
-        self.image_files = []
-        self.labels = []
-        self.tar_files = {}  # Cache for opened tar files
-        
-        if self.name_classes is None:
-            name_classes = os.listdir(folder_path)
-
-        # Load all image paths and their class names
-        for class_name in name_classes:#os.listdir(folder_path):
-            class_path = os.path.join(folder_path, class_name)
-            #if os.path.isdir(class_path):  # Only consider directories
-            #for image_name in os.listdir(class_path):
-            with tarfile.open(class_path, 'r') as tar:
-                for member in tar.getmembers():  
-                    if member.name.lower().endswith('.tif'):  # Only load .tif files
-                        self.image_files.append(os.path.join(class_path, member.name.rsplit("/",1)[-1]))
-                        #self.image_files.append((class_path, member.name))
-                        self.labels.append(class_name)
-
-        # Create a mapping of class names to integer indices
-        self.class_to_idx = {class_name.removesuffix(".tar"): idx for idx, class_name in enumerate(sorted(set(self.labels)))}
-        self.labels = [self.class_to_idx[label.removesuffix(".tar")] for label in self.labels]  # Convert labels to integers
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        complete_path = self.image_files[idx]
-        tar_path, image_filename = os.path.split(complete_path)  
-        tar_folder = os.path.splitext(os.path.basename(tar_path))[0]  # Extract folder name from tar
-        img_path = os.path.join(tar_folder, image_filename)
-        
-         # Open and cache tar file if not already opened
-        if tar_path not in self.tar_files:
-            self.tar_files[tar_path] = tarfile.open(tar_path, 'r')
-        
-        tar = self.tar_files[tar_path]
-        file = tar.extractfile(img_path)    
-        if file:    
-            image = Image.open(io.BytesIO(file.read()))
-                
-        # Apply transformations if provided
-        if self.transform:
-            image = self.transform(image)        
-                
-
-        # Get label
-        label = self.labels[idx]
-
-        # Convert label to a tensor
-        label = torch.tensor(label, dtype=torch.long)
-        
-        return image, label    
-    
-    def close(self):
-        """ Close all cached tar files to free resources. """
-        for tar in self.tar_files.values():
-            tar.close()
-        self.tar_files.clear() 
-        
-class FilteredImageDataset(ImageDataset):
-    def __init__(self, original_dataset, keep_indices):
-        """
-        Creates a new ImageDataset containing only a subset of the original images.
-        
-        Args:
-            original_dataset (ImageDataset): The original dataset.
-            keep_indices (list[int]): Indices of images to keep.
-        """
-        # Copy attributes from the original dataset
-        self.folder_path = original_dataset.folder_path
-        self.transform = original_dataset.transform
-        self.name_classes = original_dataset.name_classes
-        self.resolution = original_dataset.resolution
-        self.class_to_idx = original_dataset.class_to_idx  # Keep class mapping
-
-        # Subset the image paths and labels
-        self.image_files = [original_dataset.image_files[i] for i in keep_indices]
-        self.labels = [original_dataset.labels[i] for i in keep_indices]
-
-    def __len__(self):
-        return len(self.image_files)
-    
-            
-# class FilteredImageDataset(Dataset):
-#     def __init__(self, original_dataset, keep_indices):
-#         """
-#         Creates a filtered dataset from an existing ImageDataset.
-        
-#         Args:
-#             original_dataset (ImageDataset): The original dataset.
-#             keep_indices (list[int]): Indices of images to keep.
-#         """
-#         self.original_dataset = original_dataset
-#         self.keep_indices = keep_indices  # Indices of images to keep
-
-#     def __len__(self):
-#         return len(self.keep_indices)
-
-#     def __getitem__(self, idx):
-#         # Map new index to original dataset
-#         original_idx = self.keep_indices[idx]
-#         return self.original_dataset[original_idx]
-
-    
-
 def transform_resize(resolution: int, pad: float = 5):
     """
     Create a resize transform pipeline 
@@ -572,20 +265,6 @@ def subsample_multiple_classes(dataset, class_samples, seed=None):
     
     # Return a combined Subset
     return Subset(dataset, combined_indices)
-
-
-# def get_predictions (model,image,label):
-    
-#     with torch.no_grad():  
-#     #model.eval()
-#         out = model(image)
-#         y_pred=out.argmax(dim=1).numpy()
-            
-#         true = label.numpy()
-#         predicted = y_pred
-#         print(image)
-#     return true, predicted
-
 
 def get_predictions(model, image, label,probs= False):
     # model.to(device)  # Ensure model is on GPU
