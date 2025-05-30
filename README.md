@@ -11,9 +11,17 @@ The dataset was provided by the Ministry of Natural Resources and Forestry(MNR),
 * **/Data_examples**: It contains some images examples for the classes *Calanoid*, *Cyclopoid* and *Daphnia*. 
 
 ## Set up
- 1. Create python environment 
- 2. Install InformedML-CV by : 
+ 1. Load python in your environment
+```
+module load python
+```
 
-</pre> ```bash # Install InformedML-cv 
-pip install git+https://github.com/sofiar/InformedML-CV.git``` </pre>
+ 2. Install InformedML-CV by : 
+```
+pip install git+https://github.com/sofiar/InformedML-CV.git
+```
+3. Install any dependencies needed: There may be some libraries that need to be installed or updated:
+check if *joblib*, *torch* are installed
+
+
 
