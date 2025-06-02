@@ -20,17 +20,17 @@ print(torch.cuda.get_device_name(0))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# # Set paths 
-FilePath = '/data/zooplankton_data'
-print('Data file path: ', FilePath)
+# Set paths 
+DataPath = '/data/zooplankton_data'
+print('Data file path: ', DataPath)
 
-WeightsPath = '/data/zooplankton_data'
-print('Weights file path: ', WeightsPath)
-
-ResultsPath = '/home/ruizsuar/Environments'
+ResultsPath = '/home/ruizsuar/Analysis_zooplankton/Environments'
 print('Results file path: ', ResultsPath)
 
-PredictionsPath = '/home/ruizsuar/Predictions'
+PredictionsPath = '/home/ruizsuar/Analysis_zooplankton/Predictions'
+print('Results file path: ', PredictionsPath)
+
+MyWeightsPath = '/home/ruizsuar/Analysis_zooplankton/Weights'
 print('Results file path: ', PredictionsPath)
 
 
@@ -46,12 +46,12 @@ all_classes = ['Daphnia','Calanoid_1','Cyclopoid_1']
 # ################################################################################
 
 RESOLUTION = 64
-MAXVALUE = 50
+MAXVALUE = 2000
 
 transform_resize = samples_setup.transform_resize(resolution = RESOLUTION)
 
 all_datasets = samples_setup.ImageDataset(
-    FilePath, 
+    DataPath, 
     transform = transform_resize, 
     name_classes = all_classes,
     resolution = RESOLUTION,
@@ -108,13 +108,13 @@ val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle=True)
 # ##############################################################################
 # ######################### Resnet50 - Adam optimizer ##########################
 # ##############################################################################
-EPOCHS = 5 
+EPOCHS = 40
 
 model_resnet = models.resnet50(weights= None)
 model_keys = set(model_resnet.state_dict().keys())
 
 # load weights resnet
-weights_path =  WeightsPath + '/resnet50-0676ba61.pth'
+weights_path =  DataPath + '/resnet50-0676ba61.pth'
 # send weights to gpu
 state_dict =  torch.load(weights_path,map_location='cpu')
 weight_keys = set(state_dict.keys())
@@ -147,33 +147,34 @@ end = time.time()
 elapsed = end - start
 print(f"It took: {elapsed} secs to run")
 
-# Save environment
 
+################################################################################
+################## Save variables, weights and predictions #####################
+################################################################################
+
+# Save some important variables 
 variables_to_save = {
-    'output_resnet': output_resnet,
-    'model_resnet': model_resnet,
     'EPOCHS': EPOCHS,
-    #'train_loader': train_loader,
     'test_loader': test_loader,
     'all_classes': all_classes,
-    #'val_loader': val_loader,
     'dataset':all_datasets,
     'classes_keys': classes_keys,
-    'elapsed_time': elapsed    
+    'elapsed_time': elapsed,
+    #'train_loader': train_loader,
+    #'val_loader': val_loader   
 }
 
 where_to_save = ResultsPath +'/Env_result_Resnet50_adam.pth'
 torch.save(variables_to_save, where_to_save)
 print('Environrment saved in: '+ where_to_save)    
 
+# Save predicted labels 
 model_resnet.eval() 
 outputs = Parallel(n_jobs=10)(delayed(samples_setup.get_predictions)(
     model = model_resnet,
     image=imag.to(device),
     label=target
     ) for imag, target in test_loader)
-
-print('predictions calculated!')
 
 true_labels = []
 predict_labels = []
@@ -188,5 +189,11 @@ predict_labels = torch.cat(predict_labels)
 where_to_save = PredictionsPath + '/Pred_result_Resnet50_adam.pth'
 torch.save((true_labels, predict_labels), where_to_save)
 
+# Save models weights 
+where_to_save = MyWeightsPath  + '/Weights_Resnet50_adam.pth'
+torch.save(model_resnet.state_dict(), where_to_save)
+print('Weights saved in ', where_to_save)
+
+# Remove model object from memory
 del model_resnet  
 del output_resnet

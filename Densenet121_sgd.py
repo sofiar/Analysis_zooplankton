@@ -20,19 +20,18 @@ print(torch.cuda.get_device_name(0))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# # Set paths 
-FilePath = '/data/zooplankton_data'
-print('Data file path: ', FilePath)
+# Set paths 
+DataPath = '/data/zooplankton_data'
+print('Data file path: ', DataPath)
 
-WeightsPath = '/data/zooplankton_data'
-print('Weights file path: ', WeightsPath)
-
-ResultsPath = '/home/ruizsuar/Environments'
+ResultsPath = '/home/ruizsuar/Analysis_zooplankton/Environments'
 print('Results file path: ', ResultsPath)
 
-PredictionsPath = '/home/ruizsuar/Predictions'
+PredictionsPath = '/home/ruizsuar/Analysis_zooplankton/Predictions'
 print('Results file path: ', PredictionsPath)
 
+MyWeightsPath = '/home/ruizsuar/Analysis_zooplankton/Weights'
+print('Results file path: ', PredictionsPath)
 
 # Define classes to include in the model
 # all_classes = ['Bosmina_1','Bubbles','Calanoid_1','Chironomid','Chydoridae',
@@ -46,12 +45,12 @@ all_classes = ['Daphnia','Calanoid_1','Cyclopoid_1']
 # ################################################################################
 
 RESOLUTION = 64
-MAXVALUE = 50
+MAXVALUE = 2000
 
 transform_resize = samples_setup.transform_resize(resolution = RESOLUTION)
 
 all_datasets = samples_setup.ImageDataset(
-    FilePath, 
+    DataPath, 
     transform = transform_resize, 
     name_classes = all_classes,
     resolution = RESOLUTION,
@@ -109,13 +108,13 @@ val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle=True)
 # ###################### Densenet121 - SGD optimizer ############################
 # ################################################################################
 
-EPOCHS = 5 
+EPOCHS = 40
                          
 model_dn2 = models.densenet121(weights=None)
 model_keys = set(model_dn2.state_dict().keys())
 
 # load weights
-weights_path =  WeightsPath +  "/densenet121-a639ec97.pth"
+weights_path =  DataPath +  "/densenet121-a639ec97.pth"
 # send weights to gpu
 state_dict =  torch.load(weights_path,map_location='cpu')
 weight_keys = set(state_dict.keys())
@@ -148,35 +147,33 @@ end = time.time()
 elapsed = end - start
 print(f"It took: {elapsed} secs to run")
 
+################################################################################
+################## Save variables, weights and predictions #####################
+################################################################################
 
-# Save environment
+# Save some important variables 
 variables_to_save = {
-    'output_dn2': output_dn2,
-    'model_dn2': model_dn2,
     'EPOCHS': EPOCHS,
-    #'train_loader': train_loader,
     'test_loader': test_loader,
     'all_classes': all_classes,
-    #'val_loader': val_loader,
     'dataset':all_datasets,
     'classes_keys': classes_keys,
     'elapsed_time': elapsed,
-    'train_labels': train_labels
+    #'train_loader': train_loader,
+    #'val_loader': val_loader   
     
 }
-
-where_to_save = ResultsPath +'/Env_result_Denset121_sgd.pth'
+where_to_save = ResultsPath +'/Env_result_Densenet121_sgd.pth'
 torch.save(variables_to_save, where_to_save)
 print('Environrment saved in: '+ where_to_save)  
 
+# Save predicted labels 
 model_dn2.eval() 
 outputs = Parallel(n_jobs=10)(delayed(samples_setup.get_predictions)(
     model=model_dn2,
     image=imag.to(device),
     label=target
     ) for imag, target in test_loader)
-
-print('predictions calculated!')
 
 true_labels = []
 predict_labels = []
@@ -188,8 +185,15 @@ for true, pred in outputs:
 true_labels = torch.cat(true_labels)
 predict_labels = torch.cat(predict_labels)    
 
-where_to_save = PredictionsPath + '/Pred_result_Denset121_sgd.pth'
+where_to_save = PredictionsPath + '/Pred_result_Densenet121_sgd.pth'
 torch.save((true_labels, predict_labels), where_to_save)
+print('Predictions saved in ', where_to_save)
+
+# Save models weights 
+where_to_save = MyWeightsPath  + '/Weights_Densenet121_sgd.pth'
+torch.save(model_dn2.state_dict(), where_to_save)
+print('Weights saved in ', where_to_save)
   
+# Remove model object from memory
 del model_dn2  
 del output_dn2
