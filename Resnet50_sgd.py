@@ -54,7 +54,8 @@ all_datasets = samples_setup.ImageDataset(
     transform = transform_resize, 
     name_classes = all_classes,
     resolution = RESOLUTION,
-    num_files = MAXVALUE
+    num_files = MAXVALUE,
+    seed = 666
     )
 
 classes_keys = list(all_datasets.class_to_idx.keys())
@@ -77,7 +78,7 @@ for cl in name_classes:
 BATCH_SIZE = 80
 
 train_size = int(0.7 * len(all_datasets))
-val_size = int(0.05 * len(all_datasets))
+val_size = int(0.10 * len(all_datasets))
 test_size = len(all_datasets) - train_size - val_size
 
 print(f'train size: {train_size}')

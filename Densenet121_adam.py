@@ -54,7 +54,8 @@ all_datasets = samples_setup.ImageDataset(
     transform = transform_resize, 
     name_classes = all_classes,
     resolution = RESOLUTION,
-    num_files = MAXVALUE
+    num_files = MAXVALUE,
+    seed = 666
     )
 
 classes_keys = list(all_datasets.class_to_idx.keys())
@@ -70,14 +71,14 @@ for cl in name_classes:
     length_classes.append(len(only_class))
     print(f"Samples of {cl}: {len(only_class)}")
 
-# ################################################################################
-# ################## Define train test and validation sets #######################
-# ################################################################################
+################################################################################
+################## Define train test and validation sets #######################
+################################################################################
 
 BATCH_SIZE = 80
 
 train_size = int(0.7 * len(all_datasets))
-val_size = int(0.05 * len(all_datasets))
+val_size = int(0.10 * len(all_datasets))
 test_size = len(all_datasets) - train_size - val_size
 
 print(f'train size: {train_size}')
@@ -104,9 +105,9 @@ test_loader = DataLoader(test_dataset, batch_size = BATCH_SIZE,
                          sampler = SequentialSampler(test_dataset))
 val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle=True)
 
-# ################################################################################
-# ###################### Densenet121 - Adam optimizer ############################
-# ################################################################################
+################################################################################
+###################### Densenet121 - Adam optimizer ############################
+################################################################################
 
 EPOCHS = 40 
 
