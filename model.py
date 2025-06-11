@@ -1,21 +1,28 @@
 import time
 from datetime import datetime
+from itertools import product
 
 import torch
 import torchvision.models as models
 from torch.nn import functional as F
 from modular import engine
 
+from helper_functions import set_seed, extract_metrics
+
 class Model:
 
-    def __init__(self, data_directory, num_classes, 
-                 model_name: str = 'densenet121', device: torch.device = None):
+    def __init__(self, data_directory, num_classes, model_name: str = 'densenet121', 
+                 device: torch.device = None, seed: int = 666):
         
         # Main class initializations
         self.model_id = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.data_directory = data_directory
+        self.num_classes = num_classes
         self.model_name = model_name
         self.device = device
+        self.seed = seed
+        
+        set_seed(self.seed)
 
         # Load model and weights
         if self.model_name == 'densenet121':
@@ -32,16 +39,18 @@ class Model:
         self.model.to(self.device)
 
         if self.model_name == 'densenet121':
-            self.model.classifier = torch.nn.Linear(self.model.classifier.in_features, num_classes)
+            self.model.classifier = torch.nn.Linear(self.model.classifier.in_features, self.num_classes)
         elif self.model_name == 'resnet50':
-            self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
+            self.model.fc = torch.nn.Linear(self.model.fc.in_features, self.num_classes)
 
         # Other class initializations
         self.hyperparameters = None
         self.train_results = None
 
 
-    def train(self, train_loader, val_loader, hyperparameters: dict):
+    def train(self, hyperparameters: dict, train_loader, val_loader, verbose: bool = True):
+
+        set_seed(self.seed)
 
         self.hyperparameters = hyperparameters
 
@@ -80,10 +89,11 @@ class Model:
         )
 
         # Main training loop
-        print(f'Starting training! Model: {self.model_name} (ID: {self.model_id})')
+        if verbose:
+            print(f'\nStarting training! Model: {self.model_name} (ID: {self.model_id})\n')
 
         start = time.time()
-        self.train_results = engine.train_test_loop(
+        train_results = engine.train_test_loop(
             model = self.model,
             train_dataloader = train_loader,
             test_dataloader = val_loader,
@@ -93,11 +103,13 @@ class Model:
             Scheduler = scheduler,
             early_stopping = early_stopping,
             device = self.device,
-            print_b = True
+            print_b = verbose
         )
+        self.train_results = extract_metrics(train_results)
 
         elapsed = time.time() - start
-        print(f'Training Finished! Time Elapsed: {elapsed} sec.')
+        if verbose:
+            print(f'\nTraining Finished! Time Elapsed: {elapsed:.2f} sec.')
 
 
     def predict(self, test_loader):
@@ -108,15 +120,69 @@ class Model:
         with torch.no_grad():
             for image, label in test_loader:
                 image = image.to(self.device)
-                label = image.to(self.device)
+                label = label.to(self.device)
                 
                 output = self.model(image)
                 prob = F.softmax(output, dim = 1)
                 pred = output.argmax(dim = 1)
 
-            labels.append(label)
-            probs.append(prob)
-            preds.append(pred)
+                labels.append(label)
+                probs.append(prob)
+                preds.append(pred)
 
         return torch.cat(labels), torch.cat(probs), torch.cat(preds)
+
+
+    def gridsearch(self, parameter_grid: dict, train_loader, val_loader, scoring_fn, scoring: str = 'accuracy'):
+
+        parameters = list(parameter_grid.keys())
+
+        best_score = float('-inf')
+        best_params = None
+
+        print(f'\nStarting hyperparameter tuning!')
     
+        start = time.time()
+        for iter, param_values in enumerate(product(*parameter_grid.values())):
+
+            current_parameters = dict(zip(parameters, param_values))
+            print(f'\nStarting Iteration {iter+1}!')
+            print(f'Parameters: {current_parameters}')
+
+            start_iter = time.time()
+
+            # Initiate a new Model object and train based on current parameters
+            current_model = Model(
+                data_directory = self.data_directory,
+                num_classes = self.num_classes,
+                model_name = self.model_name,
+                device = self.device,
+                seed = self.seed
+            )
+
+            current_model.train(
+                hyperparameters = current_parameters,
+                train_loader = train_loader,
+                val_loader = val_loader,
+                verbose = False
+            )
+
+            # Get predictions and score on validation set
+            labels, _, preds = current_model.predict(val_loader)
+            score = scoring_fn(labels.cpu(), preds.cpu())
+
+            elapsed_iter = time.time() - start_iter
+            print(f'Completed Iteration {iter+1}! Time Elapsed {elapsed_iter:.2f} sec. | Score: {score:.4f}')
+
+            # Update parameters if necessary
+            if score > best_score:
+                best_score = score
+                best_params = current_parameters
+            
+            del current_model
+        
+        elapsed = time.time() - start
+        print(f'\nHyperparameter Tuning Finished! Total Time Elapsed: {elapsed:.2f} sec.')
+
+        return best_params, best_score
+

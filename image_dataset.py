@@ -10,6 +10,8 @@ from torch.nn import functional as F
 from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 
+from helper_functions import set_seed
+
 
 class ImageDataset(Dataset):
 
@@ -19,6 +21,8 @@ class ImageDataset(Dataset):
         
         self.data_directory = data_directory
         self.seed = seed
+
+        set_seed(seed)
 
         # Specify subset of classes to consider; all classes considered if None
         if class_names is None:
@@ -56,7 +60,7 @@ class ImageDataset(Dataset):
         
         # Other class initializations
         self.image_resolution = image_resolution
-        self.imgage_transforms = image_transforms
+        self.image_transforms = image_transforms
         
     
     def __len__(self):
@@ -69,8 +73,8 @@ class ImageDataset(Dataset):
         image = Image.open(self.image_paths[idx])
         label = torch.tensor(self.labels[idx], dtype=torch.long)
 
-        if self.imgage_transforms:
-            image = self.imgage_transforms(image)
+        if self.image_transforms:
+            image = self.image_transforms(image)
 
         return image, label
     
@@ -84,7 +88,7 @@ class ImageDataset(Dataset):
 
         filtered_counts = dict(Counter(filtered_labels))
 
-        print(f'Total Dataset Size: {len(filtered_labels)}\n')
+        print(f'\nTotal Dataset Size: {len(filtered_labels)}')
 
         for class_id, class_name in zip(self.class_idx, self.class_names):
             print(f'Class Name: {class_name} | Class Label: {class_id} | Count: {filtered_counts[class_id]}')
