@@ -83,10 +83,13 @@ class Model:
         
         # Early stopping
         early_stop_criteria = hyperparameters['early_stopping']
-        early_stopping = engine.EarlyStopping(
-            patience = early_stop_criteria['patience'],
-            delta = early_stop_criteria['delta']
-        )
+        if early_stop_criteria is not None:
+            early_stopping = engine.EarlyStopping(
+                patience = early_stop_criteria['patience'],
+                delta = early_stop_criteria['delta']
+            )
+        else:
+            early_stopping = None
 
         # Main training loop
         if verbose:

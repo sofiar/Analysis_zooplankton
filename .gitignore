@@ -1,5 +1,5 @@
-Environments/
-Predictions/
-Weights/
+environment/
+predictions/
+weights/
 __pycache__/
 

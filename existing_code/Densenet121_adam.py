@@ -1,5 +1,5 @@
 ################################################################################
-#   script to train and test Desnet121 with SGD optimizer to zooplankton data  #
+#  script to train and test Desnet121 with adam optimizer to zooplankton data  #
 ################################################################################
 
 import torch
@@ -10,9 +10,11 @@ from joblib import Parallel, delayed
 import torchvision.models as models
 import time
 import os
-import samples_setup
+import Analysis_zooplankton.existing_code.samples_setup as samples_setup
 
-# Set which GPU to use
+from model import Model
+
+# # Set which GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Set device
@@ -24,14 +26,14 @@ print(f"Using device: {device}")
 DataPath = '/data/zooplankton_data'
 print('Data file path: ', DataPath)
 
-ResultsPath = '/home/ruizsuar/Analysis_zooplankton/Environments'
+ResultsPath = '/home/bushra/Analysis_zooplankton/environment'
 print('Results file path: ', ResultsPath)
 
-PredictionsPath = '/home/ruizsuar/Analysis_zooplankton/Predictions'
-print('Results file path: ', PredictionsPath)
+PredictionsPath = '/home/bushra/Analysis_zooplankton/predictions'
+print('Predictions file path: ', PredictionsPath)
 
-MyWeightsPath = '/home/ruizsuar/Analysis_zooplankton/Weights'
-print('Results file path: ', PredictionsPath)
+MyWeightsPath = '/home/bushra/Analysis_zooplankton/weights'
+print('Weights file path: ', MyWeightsPath)
 
 # Define classes to include in the model
 # all_classes = ['Bosmina_1','Bubbles','Calanoid_1','Chironomid','Chydoridae',
@@ -71,9 +73,9 @@ for cl in name_classes:
     length_classes.append(len(only_class))
     print(f"Samples of {cl}: {len(only_class)}")
 
-# ################################################################################
-# ################## Define train test and validation sets #######################
-# ################################################################################
+################################################################################
+################## Define train test and validation sets #######################
+################################################################################
 
 BATCH_SIZE = 80
 
@@ -105,14 +107,14 @@ test_loader = DataLoader(test_dataset, batch_size = BATCH_SIZE,
                          sampler = SequentialSampler(test_dataset))
 val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle=True)
 
-# ################################################################################
-# ###################### Densenet121 - SGD optimizer ############################
-# ################################################################################
+################################################################################
+###################### Densenet121 - Adam optimizer ############################
+################################################################################
 
-EPOCHS = 40
-                         
-model_dn2 = models.densenet121(weights=None)
-model_keys = set(model_dn2.state_dict().keys())
+EPOCHS = 40 
+
+model_dn = models.densenet121(weights=None)
+model_keys = set(model_dn.state_dict().keys())
 
 # load weights
 weights_path =  DataPath +  "/densenet121-a639ec97.pth"
@@ -121,64 +123,67 @@ state_dict =  torch.load(weights_path,map_location='cpu')
 weight_keys = set(state_dict.keys())
 
 # load weights into model
-model_dn2.load_state_dict(state_dict,strict =False)
-model_dn2.to(device)
+model_dn.load_state_dict(state_dict,strict =False)
+model_dn.to(device)
 
-model_dn2.classifier = torch.nn.Linear(model_dn2.classifier.in_features, 
+model_dn.classifier = torch.nn.Linear(model_dn.classifier.in_features, 
                                       len(all_classes))
 
 loss_fn = torch.nn.CrossEntropyLoss()
-    
-optimizer = torch.optim.SGD(params=model_dn2.parameters(), lr=1e-3) 
+optimizer = torch.optim.Adam(params=model_dn.parameters(), lr=1e-3) 
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-print("Starting Densenet121 -SGD Inference!")
+print("Starting Densenet121 Inference!")
+
 early_stop = engine.EarlyStopping(patience=10, delta=0.005)
 
 start = time.time()
-output_dn2 = engine.train_test_loop(
-    model_dn2,train_loader,
+output_dn = engine.train_test_loop(
+    model_dn,train_loader,
     val_loader, optimizer, loss_fn,
     epochs = EPOCHS, print_b = True,
     early_stopping = early_stop,
     Scheduler = scheduler,
-    device = device)
+    device = device
+    )
 
 end = time.time()
 elapsed = end - start
+
 print(f"It took: {elapsed} secs to run")
 
-################################################################################
-################## Save variables, weights and predictions #####################
-################################################################################
+# # ################################################################################
+# # ################## Save variables, weights and predictions #####################
+# # ################################################################################
+
+print(all_classes)
+print(classes_keys)
 
 # Save some important variables 
 variables_to_save = {
     'EPOCHS': EPOCHS,
     'test_loader': test_loader,
     'all_classes': all_classes,
-    'dataset':all_datasets,
+    'dataset': all_datasets,
     'classes_keys': classes_keys,
     'elapsed_time': elapsed,
     #'train_loader': train_loader,
     #'val_loader': val_loader   
-    
 }
-where_to_save = ResultsPath +'/Env_result_Densenet121_sgd.pth'
+where_to_save = ResultsPath + '/Env_result_Densenet121_adam.pth'
 torch.save(variables_to_save, where_to_save)
-print('Environrment saved in: '+ where_to_save)  
+print('Dictionary saved in: '+ where_to_save)   
 
 # Save predicted labels 
-model_dn2.eval() 
+model_dn.eval() 
 outputs = Parallel(n_jobs=10)(delayed(samples_setup.get_predictions)(
-    model=model_dn2,
+    model=model_dn,
     image=imag.to(device),
     label=target
     ) for imag, target in test_loader)
 
 true_labels = []
 predict_labels = []
-
 for true, pred in outputs:
     true_labels.append(true)
     predict_labels.append(pred)
@@ -186,15 +191,17 @@ for true, pred in outputs:
 true_labels = torch.cat(true_labels)
 predict_labels = torch.cat(predict_labels)    
 
-where_to_save = PredictionsPath + '/Pred_result_Densenet121_sgd.pth'
+where_to_save = PredictionsPath  + '/Pred_result_Densenet121_adam.pth'
 torch.save((true_labels, predict_labels), where_to_save)
 print('Predictions saved in ', where_to_save)
 
 # Save models weights 
-where_to_save = MyWeightsPath  + '/Weights_Densenet121_sgd.pth'
-torch.save(model_dn2.state_dict(), where_to_save)
+where_to_save = MyWeightsPath  + '/Weights_Densenet121_adam.pth'
+torch.save(model_dn.state_dict(), where_to_save)
 print('Weights saved in ', where_to_save)
-  
+
 # Remove model object from memory
-del model_dn2  
-del output_dn2
+del model_dn  
+del output_dn
+
+

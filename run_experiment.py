@@ -1,6 +1,4 @@
 import os
-import copy
-
 import torch
 from torchvision import transforms
 from torch.utils.data import random_split, Subset, DataLoader, SequentialSampler
@@ -51,12 +49,13 @@ general_transforms = transforms.Compose([
     transforms.Pad(padding = IMAGE_PADDING, fill = IMAGE_FILL),
     transforms.Resize((IMAGE_RESOLUTION, IMAGE_RESOLUTION)),
     transforms.ToTensor()
-])
+]) # unused
 
 train_transforms = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
     transforms.RandomRotation(IMAGE_ROTATION),
+    transforms.ToTensor(),
     transforms.Pad(padding = IMAGE_PADDING, fill = IMAGE_FILL),
     transforms.Resize((IMAGE_RESOLUTION, IMAGE_RESOLUTION)),
 ])
@@ -67,11 +66,13 @@ dataset = ImageDataset(
     class_names = ZOOPLANKTON_CLASSES,
     max_class_size = MAX_CLASS_SIZE,
     image_resolution = IMAGE_RESOLUTION,
-    image_transforms = general_transforms,
+    image_transforms = None,
     seed = SEED
 )
 
-NUM_SAMPLES = len(dataset)
+dataset.append_image_transforms(
+    image_transforms = train_transforms
+)
 
 dataset.print_dataset_details()
 
@@ -86,39 +87,14 @@ TEST_PROP = 0.2
 
 BATCH_SIZE = 80
 
-torch.manual_seed(SEED)
+train_split, val_split, test_split = dataset.split_train_test_val()
 
-# Split Dataset
-train_split, val_split, test_split = random_split(
-    range(NUM_SAMPLES),
-    lengths = [TRAIN_PROP, VAL_PROP, TEST_PROP],
-    generator = torch.Generator().manual_seed(SEED)
-)
-
-print(f'\nTrain Samples: {len(train_split.indices)}')
-print(f'Val Samples: {len(val_split.indices)}')
-print(f'Test Samples: {len(test_split.indices)}')
-
-# Transform All Samples
-dataset_aug = copy.deepcopy(dataset)
-dataset_aug.image_transforms = transforms.Compose(
-    general_transforms.transforms + train_transforms.transforms
-)
-
-# Create Subsets
-train_dataset = Subset(dataset_aug, train_split.indices)
-val_dataset = Subset(dataset, val_split.indices)
-test_dataset = Subset(dataset, test_split.indices)
-
-# Data Loaders
-train_loader = DataLoader(train_dataset, batch_size = BATCH_SIZE, shuffle = True, 
-    generator = torch.Generator().manual_seed(SEED)
-)
-val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle = False, 
-    generator = torch.Generator().manual_seed(SEED)
-)
-test_loader = DataLoader(
-    test_dataset, batch_size = BATCH_SIZE, sampler = SequentialSampler(test_dataset)
+train_loader, val_loader, test_loader = dataset.create_dataloaders(
+    batch_size = BATCH_SIZE,
+    train_indices = train_split,
+    val_indices = val_split,
+    test_indices = test_split,
+    image_transforms = None
 )
 
 
@@ -129,12 +105,13 @@ test_loader = DataLoader(
 # Specify Model [UPDATE THIS]
 MODEL_NAME = 'densenet121' # densenet121, resnet50
 
-# Specify 
+# Specify Parameter Search Grid [UPDATE THIS]
+TUNE = False
 HYPERPARAMETER_SEARCH_GRID = {
     'loss_fn': ['CrossEntropyLoss'],
     'optimizer': ['Adam'],
     'lr': [1e-3],
-    'epochs': [10],
+    'epochs': [40],
     'scheduler': [{'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}],
     'early_stopping': [{'patience': 10, 'delta': 0.005}]
 }
@@ -146,12 +123,21 @@ model = Model(
     model_name = MODEL_NAME
 )
 
-HYPERPARAMETERS, _ = model.gridsearch(
-    parameter_grid = HYPERPARAMETER_SEARCH_GRID,
-    train_loader = train_loader,
-    val_loader = val_loader,
-    scoring_fn = accuracy_fn
-)
+if TUNE:
+    HYPERPARAMETERS, _ = model.gridsearch(
+        parameter_grid = HYPERPARAMETER_SEARCH_GRID,
+        train_loader = train_loader,
+        val_loader = val_loader,
+        scoring_fn = accuracy_fn
+    )
+else:
+    HYPERPARAMETERS = {
+        'loss_fn': 'CrossEntropyLoss', 
+        'optimizer': 'Adam', 
+        'lr': 0.001, 
+        'epochs': 40, 
+        'scheduler': {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}, 
+        'early_stopping': {'patience': 10, 'delta': 0.005}}
 
 
 # ################################################################################
@@ -172,25 +158,30 @@ labels, probs, preds = model.predict(test_loader = test_loader)
 # ################################################################################
 
 MODEL_ID = model.model_id
-run_name = f'{MODEL_ID}_{MODEL_NAME}.pth'
+SUFFIX = '' # Update for custom comments
+run_name = f'{MODEL_ID}_{MODEL_NAME}{SUFFIX}'
 
 metadata = {
     'model_id': MODEL_ID,
     'model_name': MODEL_NAME,
+    'run_name': run_name,
     'dataset': dataset,
     'classes': dataset.class_names,
-    'class_idx': {name: idx for name, idx in zip(dataset.class_names, dataset.class_idx)},
+    'class_map': {name: idx for name, idx in zip(dataset.class_names, dataset.class_indices)},
     'train_metrics': model.train_results,
     'test_loader': test_loader,
     'hyperparameters': HYPERPARAMETERS
 }
 
-# Save learned weights, predictions and results
-torch.save(model.model.state_dict(), os.path.join(results_directory, 'weights', run_name))
+SAVE = True
 
-torch.save((labels, probs, preds), os.path.join(results_directory, 'predictions', run_name))
+if SAVE:
+    print(f'Saving weights, predictions, and metadata for experiment {run_name} !')
 
-torch.save(metadata, os.path.join(results_directory, 'environment', run_name))
+    # Save learned weights, predictions and results
+    torch.save(model.model.state_dict(), os.path.join(results_directory, 'weights', run_name + '.pth'))
+    torch.save((labels, probs, preds), os.path.join(results_directory, 'predictions', run_name + '.pth'))
+    torch.save(metadata, os.path.join(results_directory, 'environment', run_name + '.pth'))
 
 # Delete model objects
 del model

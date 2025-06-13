@@ -1,5 +1,5 @@
 ################################################################################
-#  script to train and test Resnet50 with SGD optimizer to zooplankton data  #
+#   script to train and test Desnet121 with SGD optimizer to zooplankton data  #
 ################################################################################
 
 import torch
@@ -10,7 +10,7 @@ from joblib import Parallel, delayed
 import torchvision.models as models
 import time
 import os
-import samples_setup
+import Analysis_zooplankton.existing_code.samples_setup as samples_setup
 
 # Set which GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -71,9 +71,9 @@ for cl in name_classes:
     length_classes.append(len(only_class))
     print(f"Samples of {cl}: {len(only_class)}")
 
-################################################################################
-################## Define train test and validation sets #######################
-################################################################################
+# ################################################################################
+# ################## Define train test and validation sets #######################
+# ################################################################################
 
 BATCH_SIZE = 80
 
@@ -105,44 +105,44 @@ test_loader = DataLoader(test_dataset, batch_size = BATCH_SIZE,
                          sampler = SequentialSampler(test_dataset))
 val_loader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle=True)
 
-##############################################################################
-######################## Resnet50 - SGD optimizer ############################
-##############################################################################
+# ################################################################################
+# ###################### Densenet121 - SGD optimizer ############################
+# ################################################################################
 
 EPOCHS = 40
+                         
+model_dn2 = models.densenet121(weights=None)
+model_keys = set(model_dn2.state_dict().keys())
 
-model_resnet = models.resnet50(weights= None)
-model_keys = set(model_resnet.state_dict().keys())
-
-# load weights resnet
-weights_path =  DataPath + "/resnet50-0676ba61.pth"
+# load weights
+weights_path =  DataPath +  "/densenet121-a639ec97.pth"
 # send weights to gpu
 state_dict =  torch.load(weights_path,map_location='cpu')
 weight_keys = set(state_dict.keys())
 
 # load weights into model
-model_resnet.load_state_dict(state_dict,strict =False)
-model_resnet.to(device)
+model_dn2.load_state_dict(state_dict,strict =False)
+model_dn2.to(device)
 
-# Replace the final fully connected layer to account number of labels
-model_resnet.fc = torch.nn.Linear(model_resnet.fc.in_features, len(all_classes))
+model_dn2.classifier = torch.nn.Linear(model_dn2.classifier.in_features, 
+                                      len(all_classes))
+
 loss_fn = torch.nn.CrossEntropyLoss()
     
-optimizer = torch.optim.SGD(params=model_resnet.parameters(), lr=1e-3) 
+optimizer = torch.optim.SGD(params=model_dn2.parameters(), lr=1e-3) 
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-print("Starting Resnet50 Inference!")
+print("Starting Densenet121 -SGD Inference!")
 early_stop = engine.EarlyStopping(patience=10, delta=0.005)
-start = time.time()
 
-output_resnet = engine.train_test_loop(
-    model_resnet,train_loader,
+start = time.time()
+output_dn2 = engine.train_test_loop(
+    model_dn2,train_loader,
     val_loader, optimizer, loss_fn,
     epochs = EPOCHS, print_b = True,
     early_stopping = early_stop,
     Scheduler = scheduler,
-    device = device
-    )
+    device = device)
 
 end = time.time()
 elapsed = end - start
@@ -161,17 +161,17 @@ variables_to_save = {
     'classes_keys': classes_keys,
     'elapsed_time': elapsed,
     #'train_loader': train_loader,
-    #'val_loader': val_loader,
+    #'val_loader': val_loader   
+    
 }
-
-where_to_save = ResultsPath +'/Env_result_Resnet50_SGD.pth'
+where_to_save = ResultsPath +'/Env_result_Densenet121_sgd.pth'
 torch.save(variables_to_save, where_to_save)
-print('Environrment saved in: '+ where_to_save)    
+print('Environrment saved in: '+ where_to_save)  
 
-# Predictions
-model_resnet.eval() 
+# Save predicted labels 
+model_dn2.eval() 
 outputs = Parallel(n_jobs=10)(delayed(samples_setup.get_predictions)(
-    model=model_resnet,
+    model=model_dn2,
     image=imag.to(device),
     label=target
     ) for imag, target in test_loader)
@@ -186,16 +186,15 @@ for true, pred in outputs:
 true_labels = torch.cat(true_labels)
 predict_labels = torch.cat(predict_labels)    
 
-where_to_save =  PredictionsPath +'/Pred_result_Resnet50_sgd.pth'
+where_to_save = PredictionsPath + '/Pred_result_Densenet121_sgd.pth'
 torch.save((true_labels, predict_labels), where_to_save)
 print('Predictions saved in ', where_to_save)
 
 # Save models weights 
-where_to_save = MyWeightsPath  + '/Weights_Resnet50_sgd.pth'
-torch.save(model_resnet.state_dict(), where_to_save)
+where_to_save = MyWeightsPath  + '/Weights_Densenet121_sgd.pth'
+torch.save(model_dn2.state_dict(), where_to_save)
 print('Weights saved in ', where_to_save)
-
+  
 # Remove model object from memory
-del model_resnet  
-del output_resnet
-
+del model_dn2  
+del output_dn2
