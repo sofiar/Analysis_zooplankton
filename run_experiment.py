@@ -41,7 +41,17 @@ IMAGE_PADDING = 5
 IMAGE_FILL = 0
 IMAGE_ROTATION = 180
 
-ZOOPLANKTON_CLASSES = ['Daphnia', 'Calanoid_1', 'Cyclopoid_1']
+# ZOOPLANKTON_CLASSES = ['Daphnia', 'Calanoid_1', 'Cyclopoid_1']
+ZOOPLANKTON_CLASSES = [
+    'Bosmina_1',
+    'Calanoid_1',
+    'Chironomid',
+    'Chydoridae',
+    'Cyclopoid_1',
+    'Daphnia',
+    'Herpacticoida',
+    'Nauplii'
+]
 NUM_CLASSES = len(ZOOPLANKTON_CLASSES)
 
 # Image Transformations
@@ -71,7 +81,8 @@ dataset = ImageDataset(
 )
 
 dataset.append_image_transforms(
-    image_transforms = train_transforms
+    image_transforms = train_transforms,
+    verbose = False
 )
 
 dataset.print_dataset_details()
@@ -89,13 +100,18 @@ BATCH_SIZE = 80
 
 train_split, val_split, test_split = dataset.split_train_test_val()
 
+dataset.print_image_transforms()
+
 train_loader, val_loader, test_loader = dataset.create_dataloaders(
     batch_size = BATCH_SIZE,
     train_indices = train_split,
     val_indices = val_split,
     test_indices = test_split,
-    image_transforms = None
+    image_transforms = None,
+    train_weights = None
 )
+
+_, train_class_weights = dataset.compute_sample_weights(train_split)
 
 
 # ################################################################################
@@ -108,12 +124,18 @@ MODEL_NAME = 'densenet121' # densenet121, resnet50
 # Specify Parameter Search Grid [UPDATE THIS]
 TUNE = False
 HYPERPARAMETER_SEARCH_GRID = {
-    'loss_fn': ['CrossEntropyLoss'],
+    'loss_fn': [
+        {'type': 'CrossEntropyLoss', 'weights': None}
+    ],  
     'optimizer': ['Adam'],
-    'lr': [1e-3],
+    'lr': [1e-3, 5e-4],
     'epochs': [40],
-    'scheduler': [{'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}],
-    'early_stopping': [{'patience': 10, 'delta': 0.005}]
+    'scheduler': [
+        {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
+    ],
+    'early_stopping': [
+        {'patience': 10, 'delta': 0.005},
+    ],
 }
 
 model = Model(
@@ -132,12 +154,13 @@ if TUNE:
     )
 else:
     HYPERPARAMETERS = {
-        'loss_fn': 'CrossEntropyLoss', 
+        'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
         'optimizer': 'Adam', 
-        'lr': 0.001, 
+        'lr': 1e-3, 
         'epochs': 40, 
         'scheduler': {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}, 
-        'early_stopping': {'patience': 10, 'delta': 0.005}}
+        'early_stopping': {'patience': 10, 'delta': 0.005}
+    }
 
 
 # ################################################################################
@@ -158,7 +181,7 @@ labels, probs, preds = model.predict(test_loader = test_loader)
 # ################################################################################
 
 MODEL_ID = model.model_id
-SUFFIX = '' # Update for custom comments
+SUFFIX = '' # UPDATE FOR CUSTOM SUFFIX
 run_name = f'{MODEL_ID}_{MODEL_NAME}{SUFFIX}'
 
 metadata = {
@@ -176,7 +199,7 @@ metadata = {
 SAVE = True
 
 if SAVE:
-    print(f'Saving weights, predictions, and metadata for experiment {run_name} !')
+    print(f'Saving weights, predictions, and metadata for model ID: {run_name}')
 
     # Save learned weights, predictions and results
     torch.save(model.model.state_dict(), os.path.join(results_directory, 'weights', run_name + '.pth'))

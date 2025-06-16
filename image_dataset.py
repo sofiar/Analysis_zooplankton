@@ -9,7 +9,7 @@ import torch
 from torch.nn import functional as F
 from torch.utils.data import Dataset, Subset
 from torchvision import transforms
-from torch.utils.data import random_split, Subset, DataLoader, SequentialSampler
+from torch.utils.data import random_split, Subset, DataLoader, SequentialSampler, WeightedRandomSampler
 
 from helper_functions import set_seed
 
@@ -102,6 +102,13 @@ class ImageDataset(Dataset):
             )
 
 
+    def print_image_transforms(self):
+
+        print('\nCurrent Image Transform Pipeline:')
+        for tf in self.image_transforms.transforms:
+            print(' ', tf)
+
+
     def filter_to_class(self, class_id: int):
 
         filtered_idx = torch.where(torch.tensor(self.labels) == class_id)[0].tolist()
@@ -127,6 +134,20 @@ class ImageDataset(Dataset):
         
         return Subset(self, all_sampled_idx)
     
+    
+    def compute_sample_weights(self, indices, normalize_weights: bool = True):
+        labels = torch.tensor(self.labels, dtype=torch.long)
+        sub_labels = labels[indices]
+
+        class_counts = torch.bincount(sub_labels, minlength = len(self.class_names)).float()
+        class_weights = 1.0 / class_counts
+        if normalize_weights:
+            class_weights = class_weights / class_weights.sum()
+
+        sample_weights = class_weights[sub_labels]
+
+        return sample_weights, class_weights
+    
 
     def split_train_test_val(self, train_prop: float = 0.7, val_prop: float = 0.1, test_prop: float = 0.2, verbose: bool = True):
 
@@ -145,7 +166,7 @@ class ImageDataset(Dataset):
     
 
     def append_image_transforms(self, image_transforms: transforms.Compose = None, 
-                                replace: bool = False, verbose: bool = True):
+                                replace: bool = False, verbose: bool = False):
         
         if not isinstance(image_transforms, transforms.Compose):
             raise TypeError('Unsupported type: image_transforms must be a torchvision.transforms.Compose object.')
@@ -167,13 +188,12 @@ class ImageDataset(Dataset):
         self.image_transforms = transforms.Compose(image_transforms_cleaned)
 
         if verbose:
-            print('\nCurrent Image Transform Pipeline:')
-            for tf in self.image_transforms.transforms:
-                print(' ', tf)
+            self.print_image_transforms()
     
 
-    def create_dataloaders(self, batch_size: int, train_indices, val_indices, test_indices, 
-                           image_transforms: transforms.Compose = None, transform_val: bool = False):
+    def create_dataloaders(self, batch_size: int, train_indices, val_indices, test_indices,
+                           image_transforms: transforms.Compose = None, train_weights: str = None, 
+                           transform_val: bool = False):
 
         if image_transforms is not None:
             dataset_aug = copy.deepcopy(self)
@@ -191,11 +211,20 @@ class ImageDataset(Dataset):
         
         test_dataset = Subset(self, test_indices)
 
-        train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True, 
-            generator = torch.Generator().manual_seed(self.seed)
-        )
-        val_loader = DataLoader(val_dataset, batch_size = batch_size, shuffle = True, 
-            generator = torch.Generator().manual_seed(self.seed)
+        if train_weights is None:
+            train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True, 
+                generator = torch.Generator().manual_seed(self.seed)
+            )
+        elif train_weights == 'weighted':
+            train_sample_weights, _ = self.compute_sample_weights(train_indices)
+
+            train_loader = DataLoader(
+                train_dataset, batch_size = batch_size, 
+                sampler = WeightedRandomSampler(train_sample_weights, num_samples=len(train_sample_weights), replacement=True)
+            )
+
+        val_loader = DataLoader(
+            val_dataset, batch_size = batch_size, sampler = SequentialSampler(val_dataset)
         )
         test_loader = DataLoader(
             test_dataset, batch_size = batch_size, sampler = SequentialSampler(test_dataset)

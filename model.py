@@ -55,8 +55,12 @@ class Model:
         self.hyperparameters = hyperparameters
 
         # Loss function
-        if hyperparameters['loss_fn'] == 'CrossEntropyLoss':
-            loss_fn = torch.nn.CrossEntropyLoss()
+        loss_fn_spec = hyperparameters['loss_fn']
+        if loss_fn_spec['type'] == 'CrossEntropyLoss':
+            if loss_fn_spec['weights'] is not None:
+                loss_fn = torch.nn.CrossEntropyLoss(weight = loss_fn_spec['weights'].to(self.device))
+            else:
+                loss_fn = torch.nn.CrossEntropyLoss()
         else:
             raise ValueError('Unsupported loss function. Select one of CrossEntropyLoss.')
         
