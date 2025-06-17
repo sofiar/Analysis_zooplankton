@@ -1,8 +1,6 @@
 import os
 import torch
 from torchvision import transforms
-from torch.utils.data import random_split, Subset, DataLoader, SequentialSampler
-import torchvision.models as models
 
 from modular.engine import accuracy_fn
 from helper_functions import set_seed
@@ -34,7 +32,7 @@ set_seed(SEED)
 #           LOAD & TRANSFORM DATA
 # ################################################################################
 
-MAX_CLASS_SIZE = 2000
+MAX_CLASS_SIZE = 5000
 
 IMAGE_RESOLUTION = 64
 IMAGE_PADDING = 5
@@ -98,7 +96,13 @@ TEST_PROP = 0.2
 
 BATCH_SIZE = 80
 
-train_split, val_split, test_split = dataset.split_train_test_val()
+train_split, val_split, test_split = dataset.split_train_test_val(
+    verbose = False
+)
+
+train_sample_weights, train_class_weights = dataset.compute_sample_weights(
+    train_split, inverse_weights = False, normalize_weights = True
+)
 
 dataset.print_image_transforms()
 
@@ -108,10 +112,8 @@ train_loader, val_loader, test_loader = dataset.create_dataloaders(
     val_indices = val_split,
     test_indices = test_split,
     image_transforms = None,
-    train_weights = None
+    train_sample_weights = None
 )
-
-_, train_class_weights = dataset.compute_sample_weights(train_split)
 
 
 # ################################################################################
@@ -122,13 +124,14 @@ _, train_class_weights = dataset.compute_sample_weights(train_split)
 MODEL_NAME = 'densenet121' # densenet121, resnet50
 
 # Specify Parameter Search Grid [UPDATE THIS]
-TUNE = False
+TUNE = True
 HYPERPARAMETER_SEARCH_GRID = {
     'loss_fn': [
-        {'type': 'CrossEntropyLoss', 'weights': None}
+        {'type': 'CrossEntropyLoss', 'weights': None},
+        {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
     ],  
     'optimizer': ['Adam'],
-    'lr': [1e-3, 5e-4],
+    'lr': [1e-3, 5e-4, 1e-4],
     'epochs': [40],
     'scheduler': [
         {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
@@ -156,7 +159,7 @@ else:
     HYPERPARAMETERS = {
         'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
         'optimizer': 'Adam', 
-        'lr': 1e-3, 
+        'lr': 5e-4, 
         'epochs': 40, 
         'scheduler': {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}, 
         'early_stopping': {'patience': 10, 'delta': 0.005}
@@ -199,7 +202,7 @@ metadata = {
 SAVE = True
 
 if SAVE:
-    print(f'Saving weights, predictions, and metadata for model ID: {run_name}')
+    print(f'Saving weights, predictions, and metadata. Model: {MODEL_NAME} (ID: {MODEL_ID})')
 
     # Save learned weights, predictions and results
     torch.save(model.model.state_dict(), os.path.join(results_directory, 'weights', run_name + '.pth'))

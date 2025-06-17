@@ -6,7 +6,6 @@ from PIL import Image
 from collections import Counter
 
 import torch
-from torch.nn import functional as F
 from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 from torch.utils.data import random_split, Subset, DataLoader, SequentialSampler, WeightedRandomSampler
@@ -135,14 +134,20 @@ class ImageDataset(Dataset):
         return Subset(self, all_sampled_idx)
     
     
-    def compute_sample_weights(self, indices, normalize_weights: bool = True):
-        labels = torch.tensor(self.labels, dtype=torch.long)
+    def compute_sample_weights(self, indices, inverse_weights: bool = True, normalize_weights: bool = True):
+        
+        labels = torch.tensor(self.labels, dtype = torch.long)
         sub_labels = labels[indices]
 
         class_counts = torch.bincount(sub_labels, minlength = len(self.class_names)).float()
-        class_weights = 1.0 / class_counts
+
+        if inverse_weights:
+            class_weights = 1.0 / class_counts
+        elif not inverse_weights:
+            class_weights = class_counts / class_counts.sum()
+
         if normalize_weights:
-            class_weights = class_weights / class_weights.sum()
+                class_weights = class_weights / class_weights.sum()
 
         sample_weights = class_weights[sub_labels]
 
@@ -192,7 +197,7 @@ class ImageDataset(Dataset):
     
 
     def create_dataloaders(self, batch_size: int, train_indices, val_indices, test_indices,
-                           image_transforms: transforms.Compose = None, train_weights: str = None, 
+                           image_transforms: transforms.Compose = None, train_sample_weights: torch.tensor = None, 
                            transform_val: bool = False):
 
         if image_transforms is not None:
@@ -211,16 +216,14 @@ class ImageDataset(Dataset):
         
         test_dataset = Subset(self, test_indices)
 
-        if train_weights is None:
+        if train_sample_weights is None:
             train_loader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True, 
                 generator = torch.Generator().manual_seed(self.seed)
             )
-        elif train_weights == 'weighted':
-            train_sample_weights, _ = self.compute_sample_weights(train_indices)
-
+        else:
             train_loader = DataLoader(
                 train_dataset, batch_size = batch_size, 
-                sampler = WeightedRandomSampler(train_sample_weights, num_samples=len(train_sample_weights), replacement=True)
+                sampler = WeightedRandomSampler(train_sample_weights, num_samples = len(train_sample_weights), replacement = True)
             )
 
         val_loader = DataLoader(
