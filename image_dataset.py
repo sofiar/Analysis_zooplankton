@@ -6,14 +6,32 @@ from PIL import Image
 from collections import Counter
 
 import torch
-from torch.utils.data import Dataset, Subset
+from torch.utils.data import Dataset, Subset, DataLoader, SequentialSampler, WeightedRandomSampler, random_split
 from torchvision import transforms
-from torch.utils.data import random_split, Subset, DataLoader, SequentialSampler, WeightedRandomSampler
 
 from helper_functions import set_seed
 
 
 class ImageDataset(Dataset):
+
+    """
+    Custom Dataset for loading image data from specified `data_directory`.
+
+    Each subfolder in `data_directory` represents a class.
+    Contains optional class methods to:
+     - transform images for data augmentation
+     - split Dataset into train, test and validation folds
+     - compute weights required for correcting class imbalances
+
+    Args:
+        data_directory (str): Path to the main dataset folder.
+        class_names (list, optional): Specific class names to include, all class otherwise.
+        class_sizes (list, optional): Specific number of samples to include per class, max_class_size otherwise.
+        max_class_size (int): Default number of samples per class if not specified.
+        image_resolution (int): Size to which each image will be resized.
+        image_transforms (callable, optional): Optional transforms to apply.
+        seed (int): Random seed for reproducibility.
+    """
 
     def __init__(self, data_directory, 
                  class_names: list = None, class_sizes: list = None, max_class_size: int = 10000, 
@@ -65,10 +83,21 @@ class ImageDataset(Dataset):
     
     def __len__(self):
 
+        """
+        Returns the number of samples in the Dataset.
+        """
+
         return len(self.image_paths)
     
 
     def __getitem__(self, idx):
+
+        """
+        Returns the image and label of specified sample.
+
+        Args:
+            idx (int): Index of specified sample.
+        """
         
         image = Image.open(self.image_paths[idx])
         label = torch.tensor(self.labels[idx], dtype=torch.long)
@@ -80,6 +109,14 @@ class ImageDataset(Dataset):
     
     
     def print_dataset_details(self, indices: list = None, subset_name: str = None):
+
+        """
+        Prints the class distribution of the Dataset.
+
+        Args:
+            indices (list, optional): Specific indices of subset of Dataset to consider.
+            subset_name (str, optional): Specific name of subset of Dataset to print.
+        """
 
         if indices is None:
             filtered_labels = self.labels
@@ -103,6 +140,10 @@ class ImageDataset(Dataset):
 
     def print_image_transforms(self):
 
+        """
+        Prints the ordered image transformations applied to the Dataset.
+        """
+
         print('\nCurrent Image Transform Pipeline:')
         for tf in self.image_transforms.transforms:
             print(' ', tf)
@@ -110,12 +151,27 @@ class ImageDataset(Dataset):
 
     def filter_to_class(self, class_id: int):
 
+        """
+        Returns the Dataset filtered to a specified class as a Subset object.
+
+        Args:
+            class_id (int): ID of class to filter Dataset to.
+        """
+
         filtered_idx = torch.where(torch.tensor(self.labels) == class_id)[0].tolist()
 
         return Subset(self, filtered_idx)
     
 
     def subsample_classes(self, subsample_sizes: dict):
+
+        """
+        Samples each class from the Dataset and returns a Subset object.
+
+        Args:
+            subsample_sizes (dict): Key-value pairs of class label and specified sample size.
+                - Maximum number of items in dict is number of classes in Dataset.
+        """
 
         random.seed(self.seed)
 
@@ -134,10 +190,27 @@ class ImageDataset(Dataset):
         return Subset(self, all_sampled_idx)
     
     
-    def compute_sample_weights(self, indices, inverse_weights: bool = True, normalize_weights: bool = True):
-        
+    def compute_sample_weights(self, indices: list = None, inverse_weights: bool = True, normalize_weights: bool = True):
+
+        """
+        Computes weights per class in the Dataset and assigns each sample the corresponding class weight.
+        If `inverse_weights` = True, then each class weight is computed as: 1.0 / Class Size.
+        If `inverse_weights` = False, then each class weight is computed as: Class Size / Sum of All Class Sizes.
+
+        Returns `sample_weights` of length equal to number of samples and 
+            `class_weights` of length equal to number of classes.
+
+        Args:
+            indices (list, optional): Specific indices of subset of Dataset to consider.
+            inverse_weights (bool): Specifies which weights computation to use.
+            normalize_weights (bool): Specifies if weights should be normalized.
+        """
+
         labels = torch.tensor(self.labels, dtype = torch.long)
-        sub_labels = labels[indices]
+        if indices is not None:
+            sub_labels = labels[indices]
+        else:
+            sub_labels = labels
 
         class_counts = torch.bincount(sub_labels, minlength = len(self.class_names)).float()
 
@@ -156,6 +229,16 @@ class ImageDataset(Dataset):
 
     def split_train_test_val(self, train_prop: float = 0.7, val_prop: float = 0.1, test_prop: float = 0.2, verbose: bool = True):
 
+        """
+        Returns indices corresponding to the train, validation and test subsets of the Dataset.
+
+        Args:
+            trian_prop (float): Proportion of samples to allocate to the train subset.
+            val_prop (float): Proportion of samples to allocate to the validation subset.
+            test_prop (float): Proportion of samples to allocate to the test subset.
+            verbose (bool): Specifies whether to print distributions of subsets.
+        """
+
         train_split, val_split, test_split = random_split(
             range(len(self)),
             lengths = [train_prop, val_prop, test_prop],
@@ -172,6 +255,17 @@ class ImageDataset(Dataset):
 
     def append_image_transforms(self, image_transforms: transforms.Compose = None, 
                                 replace: bool = False, verbose: bool = False):
+        
+        """
+        Appends image transformations to existing transformation pipeline or replaces.
+        If multiple `ToTensor()` transformations are included in the resulting pipeline, only the last instance is kept.
+        If there are no `ToTensor()` transformations in the resulting pipeline, it is appended.
+
+        Args:
+            image_transforms(transfors.Compose, optional): Iterable of image transformations to append.
+            replace (bool): Specifies whether to replace with or append the above image_transforms.
+            verbose (bool): Specifies whether to print the resulting image transformation pipeline.
+        """
         
         if not isinstance(image_transforms, transforms.Compose):
             raise TypeError('Unsupported type: image_transforms must be a torchvision.transforms.Compose object.')
@@ -197,8 +291,22 @@ class ImageDataset(Dataset):
     
 
     def create_dataloaders(self, batch_size: int, train_indices, val_indices, test_indices,
-                           image_transforms: transforms.Compose = None, train_sample_weights: torch.tensor = None, 
-                           transform_val: bool = False):
+                           image_transforms: transforms.Compose = None, transform_val: bool = False, 
+                           train_sample_weights: torch.tensor = None):
+        
+        """
+        Creates the train, validatinon and test DataLoaders required for training a PyTorch model.
+        If `train_sample_weights` is specified, they are supplied to WeightedRandomSampler for the train subset.
+
+        Args:
+            batch_size (int): Sizes of batches to process samples in DataLoader.
+            train_indices (list): Indices corresponding to the train subset of the Dataset.
+            val_indices (list): Indices corresponding to the validation subset of the Dataset.
+            test_indices (list): Indices corresponding to the test subset of the Dataset.
+            image_transforms (transforms.Compose, optional): Additional image transformations for the train subset.
+            transform_val (bool): Specifies whether to apply train image transformations to the validation subset.
+            train_sample_weights (torch.tensor, optional): Contains weights for each sample in the train subset.
+        """
 
         if image_transforms is not None:
             dataset_aug = copy.deepcopy(self)
