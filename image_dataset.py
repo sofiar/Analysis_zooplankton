@@ -15,22 +15,33 @@ from helper_functions import set_seed
 class ImageDataset(Dataset):
 
     """
-    Custom Dataset for loading image data from specified `data_directory`.
+    A custom PyTorch Dataset for loading and preprocessing image data from a directory
+    where each subfolder represents a class.
 
-    Each subfolder in `data_directory` represents a class.
-    Contains optional class methods to:
-     - transform images for data augmentation
-     - split Dataset into train, test and validation folds
-     - compute weights required for correcting class imbalances
+    This class handles:
+    - Class-wise and random sampling with optional size limits
+    - Optional image transforms for data augmentation
+    - Preprocessing and setup for imbalanced class handling
 
     Args:
-        data_directory (str): Path to the main dataset folder.
-        class_names (list, optional): Specific class names to include, all class otherwise.
-        class_sizes (list, optional): Specific number of samples to include per class, max_class_size otherwise.
-        max_class_size (int): Default number of samples per class if not specified.
-        image_resolution (int): Size to which each image will be resized.
-        image_transforms (callable, optional): Optional transforms to apply.
-        seed (int): Random seed for reproducibility.
+        data_directory (str): Path to the root dataset directory. Each subdirectory should represent a class.
+        class_names (list, optional): List of class names to include. If None, all subdirectories are included.
+        class_sizes (list, optional): Number of samples to include per class. If None, uses `max_class_size` for all.
+        max_class_size (int, optional): Default maximum number of samples to draw per class. Defaults to 10,000.
+        image_resolution (int, optional): Final size (height and width) to resize images to. Defaults to 28.
+        image_transforms (callable, optional): Image transformations (e.g., data augmentations) to apply. Defaults to None.
+        seed (int, optional): Random seed for reproducibility. Defaults to 666.
+
+    Attributes:
+        data_directory (str): Path to the dataset root directory.
+        seed (int): Random seed used for sampling.
+        class_names (list): Sorted list of class names included in the dataset.
+        class_sizes (torch.Tensor): Tensor of the actual sampled size per class.
+        class_indices (list): Numeric index for each class (aligned with `class_names`).
+        image_paths (list): List of file paths to all sampled images.
+        labels (list): List of numeric class IDs corresponding to each image.
+        image_resolution (int): Size to which each image is resized.
+        image_transforms (callable or None): Image transformations applied during training or inference.
     """
 
     def __init__(self, data_directory, 

@@ -8,6 +8,7 @@ from helper_functions import set_seed
 from image_dataset import ImageDataset
 from model import Model
 
+
 # ################################################################################
 #           ENVIRONMENT SET-UP
 # ################################################################################
@@ -53,20 +54,21 @@ ZOOPLANKTON_CLASSES = [
 NUM_CLASSES = len(ZOOPLANKTON_CLASSES)
 
 # Image Transformations
-general_transforms = transforms.Compose([
-    transforms.Pad(padding = IMAGE_PADDING, fill = IMAGE_FILL),
-    transforms.Resize((IMAGE_RESOLUTION, IMAGE_RESOLUTION)),
-    transforms.ToTensor()
-]) # unused
-
 train_transforms = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
     transforms.RandomRotation(IMAGE_ROTATION),
-    transforms.ToTensor(),
     transforms.Pad(padding = IMAGE_PADDING, fill = IMAGE_FILL),
     transforms.Resize((IMAGE_RESOLUTION, IMAGE_RESOLUTION)),
+    transforms.ToTensor(),
 ])
+
+    # transforms.RandomAffine(
+    #     degrees=0,
+    #     translate=(0.1, 0.1),
+    #     scale=(0.9, 1.1),
+    #     shear=5
+    # ),
 
 # Define Dataset
 dataset = ImageDataset(
@@ -104,6 +106,8 @@ train_sample_weights, train_class_weights = dataset.compute_sample_weights(
     train_split, inverse_weights = False, normalize_weights = True
 )
 
+print(train_class_weights)
+
 dataset.print_image_transforms()
 
 train_loader, val_loader, test_loader = dataset.create_dataloaders(
@@ -124,7 +128,7 @@ train_loader, val_loader, test_loader = dataset.create_dataloaders(
 MODEL_NAME = 'densenet121' # densenet121, resnet50
 
 # Specify Parameter Search Grid [UPDATE THIS]
-TUNE = True
+TUNE = False
 HYPERPARAMETER_SEARCH_GRID = {
     'loss_fn': [
         {'type': 'CrossEntropyLoss', 'weights': None},

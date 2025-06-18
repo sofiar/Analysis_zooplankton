@@ -11,6 +11,35 @@ from helper_functions import set_seed, extract_metrics
 
 class Model:
 
+    """
+    A wrapper for training and evaluating image classification models using 
+    DenseNet121 or ResNet50 models.
+
+    This class handles:
+    - Model initialization with pretrained weights
+    - Replacement of the classifier head for custom number of classes
+    - Initializes the model instance
+
+    Args:
+        data_directory (str): Path to the directory containing model weights.
+        num_classes (int): Number of output classes for classification.
+        model_name (str, optional): Model to use ('densenet121' or 'resnet50'). Defaults to 'densenet121'.
+        device (torch.device, optional): Computation device (e.g., torch.device('cuda')). Defaults to None.
+        seed (int, optional): Random seed for reproducibility. Defaults to 666.
+
+    Attributes:
+        model_id (str): Unique identifier for the model instance (based on datetime).
+        data_directory (str): Path to model weights and data.
+        num_classes (int): Number of classification labels.
+        model_name (str): Architecture used by the model.
+        device (torch.device): Device on which the model runs.
+        seed (int): Random seed used for reproducibility.
+        model (torch.nn.Module): The PyTorch model instance with the custom classification head.
+        weights_path (str): File path to the pretrained weights.
+        hyperparameters (dict or None): Dictionary of training hyperparameters (set later).
+        train_results (dict or None): Stores training and evaluation metrics (set later).
+    """
+
     def __init__(self, data_directory, num_classes, model_name: str = 'densenet121', 
                  device: torch.device = None, seed: int = 666):
         
@@ -49,6 +78,26 @@ class Model:
 
 
     def train(self, hyperparameters: dict, train_loader, val_loader, verbose: bool = True):
+
+        """
+        Trains the model instance using the specified data loaders and training parameters.
+        Not all training parameters are supported. Sample hyperparameters dictionary:
+            HYPERPARAMETERS = {
+                'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
+                'optimizer': 'Adam', 
+                'lr': 5e-4, 
+                'epochs': 40, 
+                'scheduler': {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}, 
+                'early_stopping': {'patience': 10, 'delta': 0.005}
+            }
+
+        Args:
+            hyperparameters (dict): Dictionary containing training parameters such as loss function, 
+                                    optimizer type, learning rate, scheduler settings, early stopping, and epochs.
+            train_loader (DataLoader): PyTorch DataLoader containing the training dataset.
+            val_loader (DataLoader): PyTorch DataLoader containing the validation dataset.
+            verbose (bool, optional): Whether to print training progress. Defaults to True.
+        """
 
         set_seed(self.seed)
 
@@ -121,6 +170,13 @@ class Model:
 
     def predict(self, test_loader):
 
+        """
+        Generates predictions for the specified samples using the trained model instance.
+
+        Args:
+            test_loader (DataLoader): PyTorch DataLoader containing the test dataset.
+        """
+
         self.model.eval()
         labels, probs, preds = [], [], []
 
@@ -140,7 +196,33 @@ class Model:
         return torch.cat(labels), torch.cat(probs), torch.cat(preds)
 
 
-    def gridsearch(self, parameter_grid: dict, train_loader, val_loader, scoring_fn, scoring: str = 'accuracy'):
+    def gridsearch(self, parameter_grid: dict, train_loader, val_loader, scoring_fn):
+
+        """
+        Performs grid search over a set of hyperparameters to identify the best configuration.
+        Sampler parameter grid to search:
+            HYPERPARAMETER_SEARCH_GRID = {
+                'loss_fn': [
+                    {'type': 'CrossEntropyLoss', 'weights': None},
+                    {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
+                ],  
+                'optimizer': ['Adam'],
+                'lr': [1e-3, 5e-4, 1e-4],
+                'epochs': [40],
+                'scheduler': [
+                    {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
+                ],
+                'early_stopping': [
+                    {'patience': 10, 'delta': 0.005},
+                ],
+            }
+
+        Args:
+            parameter_grid (dict): Dictionary where keys are hyperparameter names and values are lists of values to try.
+            train_loader (DataLoader): PyTorch DataLoader for the training dataset.
+            val_loader (DataLoader): PyTorch DataLoader for the validation dataset.
+            scoring_fn (callable): A function to evaluate model predictions (e.g., accuracy_score or f1_score).
+        """
 
         parameters = list(parameter_grid.keys())
 
