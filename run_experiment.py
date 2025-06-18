@@ -33,7 +33,7 @@ set_seed(SEED)
 #           LOAD & TRANSFORM DATA
 # ################################################################################
 
-MAX_CLASS_SIZE = 5000
+MAX_CLASS_SIZE = 10000
 
 IMAGE_RESOLUTION = 64
 IMAGE_PADDING = 5
@@ -62,13 +62,6 @@ train_transforms = transforms.Compose([
     transforms.Resize((IMAGE_RESOLUTION, IMAGE_RESOLUTION)),
     transforms.ToTensor(),
 ])
-
-    # transforms.RandomAffine(
-    #     degrees=0,
-    #     translate=(0.1, 0.1),
-    #     scale=(0.9, 1.1),
-    #     shear=5
-    # ),
 
 # Define Dataset
 dataset = ImageDataset(
@@ -164,7 +157,7 @@ else:
         'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
         'optimizer': 'Adam', 
         'lr': 5e-4, 
-        'epochs': 40, 
+        'epochs': 50, 
         'scheduler': {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}, 
         'early_stopping': {'patience': 10, 'delta': 0.005}
     }
@@ -200,7 +193,8 @@ metadata = {
     'class_map': {name: idx for name, idx in zip(dataset.class_names, dataset.class_indices)},
     'train_metrics': model.train_results,
     'test_loader': test_loader,
-    'hyperparameters': HYPERPARAMETERS
+    'hyperparameters': HYPERPARAMETERS,
+    'image_transforms': dataset.image_transforms
 }
 
 SAVE = True

@@ -110,12 +110,14 @@ class ImageDataset(Dataset):
             idx (int): Index of specified sample.
         """
         
-        image = Image.open(self.image_paths[idx])
+        image = Image.open(self.image_paths[idx]).convert('L')
         label = torch.tensor(self.labels[idx], dtype=torch.long)
 
         if self.image_transforms:
             image = self.image_transforms(image)
 
+        image = image.repeat(3, 1, 1)
+        
         return image, label
     
     
