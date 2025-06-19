@@ -203,19 +203,17 @@ class ImageDataset(Dataset):
         return Subset(self, all_sampled_idx)
     
     
-    def compute_sample_weights(self, indices: list = None, inverse_weights: bool = True, normalize_weights: bool = True):
+    def compute_sample_weights(self, indices: list = None, weights: str = 'inverse_weighted', normalize_weights: bool = True):
 
         """
         Computes weights per class in the Dataset and assigns each sample the corresponding class weight.
-        If `inverse_weights` = True, then each class weight is computed as: 1.0 / Class Size.
-        If `inverse_weights` = False, then each class weight is computed as: Class Size / Sum of All Class Sizes.
 
         Returns `sample_weights` of length equal to number of samples and 
             `class_weights` of length equal to number of classes.
 
         Args:
             indices (list, optional): Specific indices of subset of Dataset to consider.
-            inverse_weights (bool): Specifies which weights computation to use.
+            weights (str): Specifies which weights computation to use.
             normalize_weights (bool): Specifies if weights should be normalized.
         """
 
@@ -227,13 +225,15 @@ class ImageDataset(Dataset):
 
         class_counts = torch.bincount(sub_labels, minlength = len(self.class_names)).float()
 
-        if inverse_weights:
+        if weights == 'inverse_weighted':
+            class_weights = len(self) / (class_counts * len(self.class_names))
+        elif weights == 'inverse':
             class_weights = 1.0 / class_counts
-        elif not inverse_weights:
+        elif weights == 'normalized':
             class_weights = class_counts / class_counts.sum()
 
         if normalize_weights:
-                class_weights = class_weights / class_weights.sum()
+            class_weights = class_weights / class_weights.sum()
 
         sample_weights = class_weights[sub_labels]
 

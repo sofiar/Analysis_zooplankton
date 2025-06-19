@@ -14,7 +14,7 @@ from model import Model
 # ################################################################################
 
 # Specify GPU
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 print(torch.cuda.get_device_name(0))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -42,15 +42,25 @@ IMAGE_ROTATION = 180
 
 # ZOOPLANKTON_CLASSES = ['Daphnia', 'Calanoid_1', 'Cyclopoid_1']
 ZOOPLANKTON_CLASSES = [
+    'Bosmina_1', 'Calanoid_1', 'Chironomid',
+    'Chydoridae', 'Cyclopoid_1', 'Daphnia',
+    'Herpacticoida', 'Nauplii'
+]
+ZOOPLANKTON_CLASSES = [
     'Bosmina_1',
+    'Bubbles',
     'Calanoid_1',
     'Chironomid',
     'Chydoridae',
     'Cyclopoid_1',
     'Daphnia',
+    'Floc_1',
+    'Floc_2',
     'Herpacticoida',
-    'Nauplii'
-]
+    'LargeZ-1',
+    'Nauplii',
+    'TooSmall'
+] # Sididae
 NUM_CLASSES = len(ZOOPLANKTON_CLASSES)
 
 # Image Transformations
@@ -96,10 +106,8 @@ train_split, val_split, test_split = dataset.split_train_test_val(
 )
 
 train_sample_weights, train_class_weights = dataset.compute_sample_weights(
-    train_split, inverse_weights = False, normalize_weights = True
+    train_split, weights = 'normalized', normalize_weights = False
 )
-
-print(train_class_weights)
 
 dataset.print_image_transforms()
 
@@ -128,7 +136,7 @@ HYPERPARAMETER_SEARCH_GRID = {
         {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
     ],  
     'optimizer': ['Adam'],
-    'lr': [1e-3, 5e-4, 1e-4],
+    'lr': [1e-4, 5e-4],
     'epochs': [40],
     'scheduler': [
         {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
@@ -157,8 +165,8 @@ else:
         'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
         'optimizer': 'Adam', 
         'lr': 5e-4, 
-        'epochs': 50, 
-        'scheduler': {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1}, 
+        'epochs': 60, 
+        'scheduler': {'type': 'CosineAnnealingLR', 'T_max': 50}, 
         'early_stopping': {'patience': 10, 'delta': 0.005}
     }
 

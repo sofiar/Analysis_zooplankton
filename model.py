@@ -131,8 +131,12 @@ class Model:
             scheduler = torch.optim.lr_scheduler.StepLR(
                 optimizer, step_size = scheduler_spec['step_size'], gamma = scheduler_spec['gamma']
             )
+        elif scheduler_spec['type'] == 'CosineAnnealingLR':
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max = scheduler_spec['T_max']
+            )
         else:
-            raise ValueError('Unsupported scheduler. Select one of StepLR.')
+            raise ValueError('Unsupported scheduler. Select one of StepLR or CosineAnnealingLR.')
         
         # Early stopping
         early_stop_criteria = hyperparameters['early_stopping']
