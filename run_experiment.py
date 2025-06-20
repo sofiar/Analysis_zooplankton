@@ -14,7 +14,7 @@ from model import Model
 # ################################################################################
 
 # Specify GPU
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 print(torch.cuda.get_device_name(0))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -59,8 +59,9 @@ ZOOPLANKTON_CLASSES = [
     'Herpacticoida',
     'LargeZ-1',
     'Nauplii',
+    'Sididae',
     'TooSmall'
-] # Sididae
+]
 NUM_CLASSES = len(ZOOPLANKTON_CLASSES)
 
 # Image Transformations
@@ -106,7 +107,7 @@ train_split, val_split, test_split = dataset.split_train_test_val(
 )
 
 train_sample_weights, train_class_weights = dataset.compute_sample_weights(
-    train_split, weights = 'normalized', normalize_weights = False
+    train_split, weights = 'softmax_inverse'
 )
 
 dataset.print_image_transforms()
@@ -132,11 +133,10 @@ MODEL_NAME = 'densenet121' # densenet121, resnet50
 TUNE = False
 HYPERPARAMETER_SEARCH_GRID = {
     'loss_fn': [
-        {'type': 'CrossEntropyLoss', 'weights': None},
         {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
     ],  
     'optimizer': ['Adam'],
-    'lr': [1e-4, 5e-4],
+    'lr': [5e-4],
     'epochs': [40],
     'scheduler': [
         {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
@@ -158,7 +158,7 @@ if TUNE:
         parameter_grid = HYPERPARAMETER_SEARCH_GRID,
         train_loader = train_loader,
         val_loader = val_loader,
-        scoring_fn = accuracy_fn
+        scoring_fn = accuracy_fn,
     )
 else:
     HYPERPARAMETERS = {
@@ -189,7 +189,7 @@ labels, probs, preds = model.predict(test_loader = test_loader)
 # ################################################################################
 
 MODEL_ID = model.model_id
-SUFFIX = '' # UPDATE FOR CUSTOM SUFFIX
+SUFFIX = '_balanced' # UPDATE FOR CUSTOM SUFFIX
 run_name = f'{MODEL_ID}_{MODEL_NAME}{SUFFIX}'
 
 metadata = {
@@ -209,6 +209,7 @@ SAVE = True
 
 if SAVE:
     print(f'Saving weights, predictions, and metadata. Model: {MODEL_NAME} (ID: {MODEL_ID})')
+    print(f'Run Name: {run_name}')
 
     # Save learned weights, predictions and results
     torch.save(model.model.state_dict(), os.path.join(results_directory, 'weights', run_name + '.pth'))

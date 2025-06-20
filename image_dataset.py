@@ -203,7 +203,7 @@ class ImageDataset(Dataset):
         return Subset(self, all_sampled_idx)
     
     
-    def compute_sample_weights(self, indices: list = None, weights: str = 'inverse_weighted', normalize_weights: bool = True):
+    def compute_sample_weights(self, indices: list = None, weights: str = 'inverse_weighted', normalize_weights: bool = False):
 
         """
         Computes weights per class in the Dataset and assigns each sample the corresponding class weight.
@@ -225,12 +225,20 @@ class ImageDataset(Dataset):
 
         class_counts = torch.bincount(sub_labels, minlength = len(self.class_names)).float()
 
-        if weights == 'inverse_weighted':
-            class_weights = len(self) / (class_counts * len(self.class_names))
-        elif weights == 'inverse':
+        if weights == 'balanced':
+            class_weights = len(indices) / (class_counts * len(self.class_names))
+        elif weights == 'inverse_freq':
             class_weights = 1.0 / class_counts
+        elif weights == 'inverse_square_root':
+            class_weights = 1.0 / torch.sqrt(class_counts)
+        elif weights == 'inverse_log':
+            class_weights = 1.0 / torch.log(class_counts + 1.2) # small constant
+        elif weights == 'softmax_inverse':
+            class_weights = torch.softmax(1.0 / class_counts, dim = 0)
         elif weights == 'normalized':
             class_weights = class_counts / class_counts.sum()
+        else:
+            raise ValueError('Unsupported weights computation. Select one of balance, inverse_freq, inverse_square_root, inverse_log, softmax_inverse, or normalized.')
 
         if normalize_weights:
             class_weights = class_weights / class_weights.sum()
