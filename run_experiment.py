@@ -162,7 +162,7 @@ if TUNE:
     )
 else:
     HYPERPARAMETERS = {
-        'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
+        'loss_fn': {'type': 'CrossEntropyLoss', 'weights': None}, 
         'optimizer': 'Adam', 
         'lr': 5e-4, 
         'epochs': 60, 
@@ -189,7 +189,7 @@ labels, probs, preds = model.predict(test_loader = test_loader)
 # ################################################################################
 
 MODEL_ID = model.model_id
-SUFFIX = '_balanced' # UPDATE FOR CUSTOM SUFFIX
+SUFFIX = '' # UPDATE FOR CUSTOM SUFFIX
 run_name = f'{MODEL_ID}_{MODEL_NAME}{SUFFIX}'
 
 metadata = {
