@@ -40,12 +40,6 @@ IMAGE_PADDING = 5
 IMAGE_FILL = 0
 IMAGE_ROTATION = 180
 
-# ZOOPLANKTON_CLASSES = ['Daphnia', 'Calanoid_1', 'Cyclopoid_1']
-ZOOPLANKTON_CLASSES = [
-    'Bosmina_1', 'Calanoid_1', 'Chironomid',
-    'Chydoridae', 'Cyclopoid_1', 'Daphnia',
-    'Herpacticoida', 'Nauplii'
-]
 ZOOPLANKTON_CLASSES = [
     'Bosmina_1',
     'Bubbles',
@@ -100,7 +94,7 @@ TRAIN_PROP = 0.7
 VAL_PROP = 0.1
 TEST_PROP = 0.2
 
-BATCH_SIZE = 80
+BATCH_SIZE = 64
 
 train_split, val_split, test_split = dataset.split_train_test_val(
     verbose = False
@@ -133,13 +127,16 @@ MODEL_NAME = 'densenet121' # densenet121, resnet50
 TUNE = False
 HYPERPARAMETER_SEARCH_GRID = {
     'loss_fn': [
+        {'type': 'CrossEntropyLoss', 'weights': None},
         {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
     ],  
     'optimizer': ['Adam'],
-    'lr': [5e-4],
-    'epochs': [40],
+    'lr': [1e-4, 5e-4],
+    'epochs': [60],
     'scheduler': [
         {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
+        {'type': 'CosineAnnealingLR', 'T_max': 50},
+        {'type': 'OneCycleLR', 'max_lr': 1e-3}
     ],
     'early_stopping': [
         {'patience': 10, 'delta': 0.005},
@@ -162,12 +159,12 @@ if TUNE:
     )
 else:
     HYPERPARAMETERS = {
-        'loss_fn': {'type': 'CrossEntropyLoss', 'weights': None}, 
+        'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
         'optimizer': 'Adam', 
         'lr': 5e-4, 
-        'epochs': 60, 
-        'scheduler': {'type': 'CosineAnnealingLR', 'T_max': 50}, 
-        'early_stopping': {'patience': 10, 'delta': 0.005}
+        'epochs': 80, 
+        'scheduler':{'type': 'CosineAnnealingLR', 'T_max': 50},
+        'early_stopping': {'patience': 15, 'delta': 0.005}
     }
 
 

@@ -135,8 +135,12 @@ class Model:
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer, T_max = scheduler_spec['T_max']
             )
+        elif scheduler_spec['type'] == 'OneCycleLR':
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer, max_lr = scheduler_spec['max_lr'], epochs = hyperparameters['epochs'], steps_per_epoch = len(train_loader)
+            )
         else:
-            raise ValueError('Unsupported scheduler. Select one of StepLR or CosineAnnealingLR.')
+            raise ValueError('Unsupported scheduler. Select one of StepLR, CosineAnnealingLR or OneCycleLR.')
         
         # Early stopping
         early_stop_criteria = hyperparameters['early_stopping']
