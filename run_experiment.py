@@ -14,7 +14,7 @@ from model import Model
 # ################################################################################
 
 # Specify GPU
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 print(torch.cuda.get_device_name(0))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -33,7 +33,7 @@ set_seed(SEED)
 #           LOAD & TRANSFORM DATA
 # ################################################################################
 
-MAX_CLASS_SIZE = 10000
+MAX_CLASS_SIZE = 15000
 
 IMAGE_RESOLUTION = 64
 IMAGE_PADDING = 5
@@ -167,6 +167,7 @@ else:
         'early_stopping': {'patience': 15, 'delta': 0.005}
     }
 
+HYPERPARAMETERS['batch_size'] = BATCH_SIZE
 
 # ################################################################################
 #           TRAIN MODEL & PREDICT
@@ -199,7 +200,8 @@ metadata = {
     'train_metrics': model.train_results,
     'test_loader': test_loader,
     'hyperparameters': HYPERPARAMETERS,
-    'image_transforms': dataset.image_transforms
+    'image_transforms': dataset.image_transforms,
+    'max_class_size': MAX_CLASS_SIZE,
 }
 
 SAVE = True
