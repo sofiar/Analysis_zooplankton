@@ -2,12 +2,10 @@ import os
 import torch
 from torchvision import transforms
 
-from modular.engine import accuracy_fn
 from helper_functions import set_seed
 
 from image_dataset import ImageDataset
 from model import Model
-
 
 # ################################################################################
 #           ENVIRONMENT SET-UP
@@ -16,9 +14,7 @@ from model import Model
 # Specify GPU
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-print(torch.cuda.get_device_name(0))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f'Using device: {device}')
 
 # Specify paths
 data_directory = '/data/zooplankton_data'
@@ -30,15 +26,8 @@ set_seed(SEED)
 
 
 # ################################################################################
-#           LOAD & TRANSFORM DATA
+#           GLOBAL VARIABLES
 # ################################################################################
-
-MAX_CLASS_SIZE = 15000
-
-IMAGE_RESOLUTION = 64
-IMAGE_PADDING = 5
-IMAGE_FILL = 0
-IMAGE_ROTATION = 180
 
 ZOOPLANKTON_CLASSES = [
     'Bosmina_1',
@@ -56,58 +45,44 @@ ZOOPLANKTON_CLASSES = [
     'Sididae',
     'TooSmall'
 ]
-NUM_CLASSES = len(ZOOPLANKTON_CLASSES)
 
-# Image Transformations
 train_transforms = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
-    transforms.RandomRotation(IMAGE_ROTATION),
-    transforms.Pad(padding = IMAGE_PADDING, fill = IMAGE_FILL),
-    transforms.Resize((IMAGE_RESOLUTION, IMAGE_RESOLUTION)),
+    transforms.RandomRotation(180),
+    transforms.Pad(padding = 5, fill = 0),
+    transforms.Resize((64, 64)),
     transforms.ToTensor(),
 ])
 
-# Define Dataset
+
+# ################################################################################
+#           PREPARE DATA
+# ################################################################################
+
 dataset = ImageDataset(
     data_directory = data_directory,
     class_names = ZOOPLANKTON_CLASSES,
-    max_class_size = MAX_CLASS_SIZE,
-    image_resolution = IMAGE_RESOLUTION,
+    max_class_size = 15000,
+    image_resolution = 64,
     image_transforms = None,
     seed = SEED
 )
 
 dataset.append_image_transforms(
-    image_transforms = train_transforms,
-    verbose = False
+    image_transforms = train_transforms, verbose = False
 )
 
-dataset.print_dataset_details()
-
-
-# ################################################################################
-#           TRAIN, TEST & VALIDATION
-# ################################################################################
-
-TRAIN_PROP = 0.7
-VAL_PROP = 0.1
-TEST_PROP = 0.2
-
-BATCH_SIZE = 64
-
 train_split, val_split, test_split = dataset.split_train_test_val(
-    train_prop = TRAIN_PROP, val_prop = VAL_PROP, test_prop = TEST_PROP, verbose = False
+    train_prop = 0.7, val_prop = 0.1, test_prop = 0.2, verbose = False
 )
 
 train_sample_weights, train_class_weights = dataset.compute_sample_weights(
     train_split, weights = 'softmax_inverse'
 )
 
-dataset.print_image_transforms()
-
 train_loader, val_loader, test_loader = dataset.create_dataloaders(
-    batch_size = BATCH_SIZE,
+    batch_size = 64,
     train_indices = train_split,
     val_indices = val_split,
     test_indices = test_split,
@@ -117,59 +92,25 @@ train_loader, val_loader, test_loader = dataset.create_dataloaders(
 
 
 # ################################################################################
-#           HYPERPARAMETER TUNING
+#           TRAIN FINAL MODEL
 # ################################################################################
 
-# Specify Model [UPDATE THIS]
-MODEL_NAME = 'resnet50' # densenet121, resnet50
-
-# Specify Parameter Search Grid [UPDATE THIS]
-TUNE = True
-HYPERPARAMETER_SEARCH_GRID = {
-    'loss_fn': [
-        {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
-    ],  
-    'optimizer': ['Adam'],
-    'lr': [1e-4, 1e-3],
-    'epochs': [50],
-    'scheduler': [
-        {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
-        {'type': 'CosineAnnealingLR', 'T_max': 50},
-    ],
-    'early_stopping': [
-        {'patience': 15, 'delta': 0.005},
-    ],
+HYPERPARAMETERS = {
+    'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
+    'optimizer': 'Adam', 
+    'lr': 5e-4, 
+    'epochs': 80, 
+    'scheduler':{'type': 'CosineAnnealingLR', 'T_max': 50},
+    'early_stopping': {'patience': 15, 'delta': 0.005},
+    'batch_size': 64
 }
 
 model = Model(
     data_directory = data_directory,
     device = device,
-    num_classes = NUM_CLASSES,
-    model_name = MODEL_NAME
+    num_classes = 14,
+    model_name = 'densenet121'
 )
-
-if TUNE:
-    HYPERPARAMETERS, _ = model.gridsearch(
-        parameter_grid = HYPERPARAMETER_SEARCH_GRID,
-        train_loader = train_loader,
-        val_loader = val_loader,
-        scoring_fn = accuracy_fn,
-    )
-else:
-    HYPERPARAMETERS = {
-        'loss_fn': {'type': 'CrossEntropyLoss', 'weights': train_class_weights}, 
-        'optimizer': 'Adam', 
-        'lr': 5e-4, 
-        'epochs': 80, 
-        'scheduler':{'type': 'CosineAnnealingLR', 'T_max': 50},
-        'early_stopping': {'patience': 15, 'delta': 0.005}
-    }
-
-HYPERPARAMETERS['batch_size'] = BATCH_SIZE
-
-# ################################################################################
-#           TRAIN MODEL & PREDICT
-# ################################################################################
 
 model.train(
     hyperparameters = HYPERPARAMETERS,
@@ -185,12 +126,11 @@ labels, probs, preds = model.predict(test_loader = test_loader)
 # ################################################################################
 
 MODEL_ID = model.model_id
-SUFFIX = '' # UPDATE FOR CUSTOM SUFFIX
-run_name = f'{MODEL_ID}_{MODEL_NAME}{SUFFIX}'
+run_name = f'{MODEL_ID}_final'
 
 metadata = {
     'model_id': MODEL_ID,
-    'model_name': MODEL_NAME,
+    'model_name': 'densenet121',
     'run_name': run_name,
     'dataset': dataset,
     'classes': dataset.class_names,
@@ -199,13 +139,13 @@ metadata = {
     'test_loader': test_loader,
     'hyperparameters': HYPERPARAMETERS,
     'image_transforms': dataset.image_transforms,
-    'max_class_size': MAX_CLASS_SIZE,
+    'max_class_size': 15000,
 }
 
 SAVE = True
 
 if SAVE:
-    print(f'Saving weights, predictions, and metadata. Model: {MODEL_NAME} (ID: {MODEL_ID})')
+    print(f'Saving weights, predictions, and metadata.')
     print(f'Run Name: {run_name}')
 
     # Save learned weights, predictions and results
