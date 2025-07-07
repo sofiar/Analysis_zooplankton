@@ -2,4 +2,8 @@ environment/
 predictions/
 weights/
 __pycache__/
+existing_code/
+image_dataset.py
+model.py
+run_experiments.py
 
