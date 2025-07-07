@@ -145,7 +145,7 @@ for cls_id in unique_classes:
     n_cols = int(np.ceil(np.sqrt(n_samples)))
     n_rows = int(np.ceil(n_samples / n_cols))
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize = (n_cols * 2, n_cols * 2))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize = (6, 6))
     axes = axes.flatten() if n_samples > 1 else [axes]
 
     # Plot each image
@@ -159,7 +159,7 @@ for cls_id in unique_classes:
 
         colour = 'green' if label == pred else 'red'
         rect = patches.Rectangle(
-            (0, 0), 1, 1, transform = ax.transAxes, linewidth = 4, edgecolor = colour, facecolor = 'none'
+            (0, 0), 1, 1, transform = ax.transAxes, linewidth = 3, edgecolor = colour, facecolor = 'none'
         )
         ax.add_patch(rect)
         ax.axis('off')
@@ -169,11 +169,15 @@ for cls_id in unique_classes:
         axes[j].axis('off')
 
     cls_name = class_map_rev[cls_id.item()]
-    plt.suptitle(f'True Class: {cls_name}', fontsize=14)
+    plt.suptitle(f'True Class: {cls_name}', fontsize = 10)
     plt.tight_layout()
 
     # Save file
     inference_plot_path = os.path.join(inference_directory, f'{cls_name}.png')
+
+    if os.path.exists(inference_plot_path):
+        os.remove(inference_plot_path)
+
     plt.savefig(inference_plot_path, dpi = 300, bbox_inches = 'tight')
     plt.close()
 
