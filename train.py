@@ -30,7 +30,7 @@ print(f'Using device: {device}')
 
 # Specify paths
 data_directory = '/data/zooplankton_data'
-results_directory = '/home/bushra/Analysis_zooplankton/'
+repository_root = os.path.dirname(os.path.abspath(__file__))
 
 # Specify other environment variables
 SEED = 666
@@ -85,8 +85,7 @@ train_transforms = transforms.Compose([
 ])
 
 dataset.append_image_transforms(
-    image_transforms = train_transforms,
-    verbose = False
+    image_transforms = train_transforms, verbose = False
 )
 
 # Split Data into Train and Test
@@ -204,9 +203,9 @@ metadata = {
 }
 
 # Save learned weights, predictions and results
-torch.save(model.state_dict(), os.path.join(results_directory, run_name, 'weights.pth'))
-torch.save((labels, probs, preds), os.path.join(results_directory, run_name, 'predictions.pth'))
-torch.save(metadata, os.path.join(results_directory, run_name, 'environment.pth'))
+torch.save(model.state_dict(), os.path.join(repository_root, run_name, 'weights.pth'))
+torch.save((labels, probs, preds), os.path.join(repository_root, run_name, 'predictions.pth'))
+torch.save(metadata, os.path.join(repository_root, run_name, 'environment.pth'))
 
 # Delete model objects
 del model

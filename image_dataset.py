@@ -45,8 +45,9 @@ class ImageDataset(Dataset):
     """
 
     def __init__(self, data_directory, 
-                 class_names: list = None, class_sizes: list = None, max_class_size: int = 10000, 
-                 image_resolution: int = 28, image_transforms = None, seed: int = 666):
+                 class_names: list = None, class_sizes: list = None, class_indices: list = None,
+                 max_class_size: int = 10000, image_resolution: int = 28, image_transforms = None, 
+                 seed: int = 666):
         
         self.data_directory = data_directory
         self.seed = seed
@@ -62,18 +63,24 @@ class ImageDataset(Dataset):
             class_sizes = [max_class_size] * len(class_names)
         
         self.class_names, self.class_sizes = map(list, zip(*sorted(zip(class_names, class_sizes))))
-        self.class_indices = list(range(len(self.class_names)))
+
+        if class_indices is None:
+            self.class_indices = list(range(len(self.class_names)))
+        else:
+            self.class_indices = class_indices
+
+        self.class_order = list(range(len(self.class_names)))
 
         # Iterate through each class and sample .tif images only; append paths and labels
         self.image_paths = []
         self.labels = []
 
-        for class_id, class_name in zip(self.class_indices, self.class_names):
+        for class_id, class_ord, class_name in zip(self.class_indices, self.class_order, self.class_names):
             class_directory = os.path.join(data_directory, class_name)
 
             if os.path.isdir(class_directory):
                 class_paths = os.listdir(class_directory)
-                new_class_size = min(self.class_sizes[class_id], len(class_paths))
+                new_class_size = min(self.class_sizes[class_ord], len(class_paths))
 
                 random.seed(self.seed)
                 sampled_paths = random.sample(class_paths, new_class_size)
@@ -84,7 +91,7 @@ class ImageDataset(Dataset):
                     else:
                         new_class_size -= 1
 
-            self.class_sizes[class_id] = new_class_size
+            self.class_sizes[class_ord] = new_class_size
             self.labels.extend([class_id] * new_class_size)
         
         # Other class initializations
