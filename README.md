@@ -4,9 +4,10 @@ This repository contains scripts to train a CNN to classify images of Zooplankto
 The dataset was provided by the Ministry of Natural Resources and Forestry (MNR), Government of Ontario.
 
 The model is trained to classify the following 14 species:
-`Bosmina`, `Bubbles`, `Calanoid`, `Chydoridae`, `Chironomid`, `Cyclopoid`, `Daphnia`, `Floc 1`, `Floc 2`, `Harpacticoid`, `LargeZ-1`, `Nauploo`, `Sididae`, `TooSmall`
 
-Note that in some analyses, the less important classes (Bubbles, Floc 1 & 2, LargeZ-1, Nauploo, Sididae, TooSmall) are considered as one class: Other.
+`Bosmina`, `Bubbles`, `Calanoid_1`, `Chydoridae`, `Chironomid`, `Cyclopoid_1`, `Daphnia`, `Floc_1`, `Floc_2`, `Harpacticoid`, `LargeZ-1`, `Nauploo`, `Sididae`, `TooSmall`
+
+Note that in some analyses, the less important classes (`Bubbles`, `Floc 1`, `Floc 2`, `LargeZ-1`, `Nauploo`, `Sididae`, `TooSmall`) are considered as one class: `Other`.
 
 ## 📂 Contents
 ### 🗄️ Scripts
