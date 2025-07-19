@@ -186,7 +186,7 @@ class Model:
         """
 
         self.model.eval()
-        labels, probs, preds = [], [], []
+        labels, probs, preds, logits = [], [], [], []
 
         with torch.no_grad():
             for image, label in test_loader:
@@ -200,8 +200,10 @@ class Model:
                 labels.append(label)
                 probs.append(prob)
                 preds.append(pred)
+                logits.append(output)
 
-        return torch.cat(labels), torch.cat(probs), torch.cat(preds)
+
+        return torch.cat(labels), torch.cat(probs), torch.cat(preds), torch.cat(logits)
 
 
     def gridsearch(self, parameter_grid: dict, train_loader, val_loader, scoring_fn):

@@ -2,7 +2,7 @@ import os
 import copy
 import random
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from collections import Counter
 
 import torch
@@ -24,7 +24,8 @@ class ImageDataset(Dataset):
     - Preprocessing and setup for imbalanced class handling
 
     Args:
-        data_directory (str): Path to the root dataset directory. Each subdirectory should represent a class.
+        data_directory (str): Path to the root dataset directory. Each subdirectory should represent a class or another subdirectory to check.
+        data_subdirectories (list of str, optional): Subdirectories with additional images, each sub-subdirectory should represent a class.
         class_names (list, optional): List of class names to include. If None, all subdirectories are included.
         class_sizes (list, optional): Number of samples to include per class. If None, uses `max_class_size` for all.
         max_class_size (int, optional): Default maximum number of samples to draw per class. Defaults to 10,000.
@@ -34,6 +35,7 @@ class ImageDataset(Dataset):
 
     Attributes:
         data_directory (str): Path to the dataset root directory.
+        data_subdirectories (list of str): Subdirectories with additional images.
         seed (int): Random seed used for sampling.
         class_names (list): Sorted list of class names included in the dataset.
         class_sizes (torch.Tensor): Tensor of the actual sampled size per class.
@@ -44,14 +46,19 @@ class ImageDataset(Dataset):
         image_transforms (callable or None): Image transformations applied during training or inference.
     """
 
-    def __init__(self, data_directory, 
+    def __init__(self, data_directory, data_subdirectories: list = None,
                  class_names: list = None, class_sizes: list = None, max_class_size: int = 10000, 
                  image_resolution: int = 28, image_transforms = None, seed: int = 666):
         
         self.data_directory = data_directory
+        self.data_subdirectories = ['']
         self.seed = seed
 
         set_seed(seed)
+
+        # Additional subdirectories to check
+        if data_subdirectories is not None:
+            self.data_subdirectories.extend(data_subdirectories)
 
         # Specify subset of classes to consider; all classes considered if None
         if class_names is None:
@@ -69,20 +76,35 @@ class ImageDataset(Dataset):
         self.labels = []
 
         for class_id, class_name in zip(self.class_indices, self.class_names):
-            class_directory = os.path.join(data_directory, class_name)
 
-            if os.path.isdir(class_directory):
-                class_paths = os.listdir(class_directory)
-                new_class_size = min(self.class_sizes[class_id], len(class_paths))
+            # Retrieve all image paths across directories for specified class
+            class_paths = []
 
-                random.seed(self.seed)
-                sampled_paths = random.sample(class_paths, new_class_size)
+            for data_subdirectory in self.data_subdirectories:
 
-                for image_path in sampled_paths:
-                    if image_path.lower().endswith('.tif'):
-                        self.image_paths.append(os.path.join(class_directory, image_path))
-                    else:
+                class_directory = os.path.join(data_directory, data_subdirectory, class_name)
+
+                if os.path.isdir(class_directory):
+                    class_paths.extend(
+                        [os.path.join(class_directory, filename) for filename in os.listdir(class_directory)]
+                    )
+
+            # Determine new class size and sample images, only include .tif files
+            new_class_size = min(self.class_sizes[class_id], len(class_paths))
+
+            random.seed(self.seed)
+            sampled_paths = random.sample(class_paths, new_class_size)
+            
+            for image_path in sampled_paths:
+                if image_path.lower().endswith('.tif'):
+                    try:
+                        with Image.open(image_path) as img:
+                            img.verify()
+                        self.image_paths.append(image_path)
+                    except (UnidentifiedImageError, OSError, ValueError):
                         new_class_size -= 1
+                else:
+                    new_class_size -= 1
 
             self.class_sizes[class_id] = new_class_size
             self.labels.extend([class_id] * new_class_size)

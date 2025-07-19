@@ -14,7 +14,7 @@ from model import Model
 # ################################################################################
 
 # Specify GPU
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 print(torch.cuda.get_device_name(0))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -22,6 +22,7 @@ print(f'Using device: {device}')
 
 # Specify paths
 data_directory = '/data/zooplankton_data'
+data_subdirectories = ['New_data_July2025']
 results_directory = '/home/bushra/Analysis_zooplankton/'
 
 # Specify other environment variables
@@ -71,6 +72,7 @@ train_transforms = transforms.Compose([
 # Define Dataset
 dataset = ImageDataset(
     data_directory = data_directory,
+    data_subdirectories = data_subdirectories,
     class_names = ZOOPLANKTON_CLASSES,
     max_class_size = MAX_CLASS_SIZE,
     image_resolution = IMAGE_RESOLUTION,
@@ -121,17 +123,18 @@ train_loader, val_loader, test_loader = dataset.create_dataloaders(
 # ################################################################################
 
 # Specify Model [UPDATE THIS]
-MODEL_NAME = 'resnet50' # densenet121, resnet50
+MODEL_NAME = 'densenet121' # densenet121, resnet50
 
 # Specify Parameter Search Grid [UPDATE THIS]
-TUNE = True
+TUNE = False
 HYPERPARAMETER_SEARCH_GRID = {
     'loss_fn': [
         {'type': 'CrossEntropyLoss', 'weights': train_class_weights},
+        {'type': 'CrossEntropyLoss', 'weights': None},
     ],  
     'optimizer': ['Adam'],
-    'lr': [1e-4, 1e-3],
-    'epochs': [50],
+    'lr': [1e-4],
+    'epochs': [45],
     'scheduler': [
         {'type': 'StepLR', 'step_size': 10, 'gamma': 0.1},
         {'type': 'CosineAnnealingLR', 'T_max': 50},
