@@ -22,7 +22,7 @@ from helper_functions import set_seed, extract_metrics
 # ################################################################################
 
 # Specify GPU
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 print(torch.cuda.get_device_name(0))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,6 +30,7 @@ print(f'Using device: {device}')
 
 # Specify paths
 data_directory = '/data/zooplankton_data'
+data_subdirectories = ['New_data_July2025']
 repository_root = os.path.dirname(os.path.abspath(__file__))
 
 # Specify other environment variables
@@ -67,6 +68,7 @@ NUM_CLASSES = len(ZOOPLANKTON_CLASSES)
 # Define Dataset
 dataset = ImageDataset(
     data_directory = data_directory,
+    data_subdirectories = data_subdirectories,
     class_names = ZOOPLANKTON_CLASSES,
     max_class_size = 15000,
     image_resolution = 64,
@@ -165,7 +167,7 @@ train_results = extract_metrics(train_results)
 # The model was properly validated during development without contamination
 
 model.eval()
-labels, probs, preds = [], [], []
+labels, probs, preds, logits = [], [], [], []
 
 with torch.no_grad():
     for image, label in test_loader:
@@ -179,8 +181,9 @@ with torch.no_grad():
         labels.append(label)
         probs.append(prob)
         preds.append(pred)
+        logits.append(output)
 
-labels, probs, preds = torch.cat(labels), torch.cat(probs), torch.cat(preds)
+labels, probs, preds, logits = torch.cat(labels), torch.cat(probs), torch.cat(preds), torch.cat(logits)
 
 
 # ################################################################################
@@ -204,7 +207,7 @@ metadata = {
 
 # Save learned weights, predictions and results
 torch.save(model.state_dict(), os.path.join(repository_root, run_name, 'weights.pth'))
-torch.save((labels, probs, preds), os.path.join(repository_root, run_name, 'predictions.pth'))
+torch.save((labels, probs, preds, logits), os.path.join(repository_root, run_name, 'predictions.pth'))
 torch.save(metadata, os.path.join(repository_root, run_name, 'environment.pth'))
 
 # Delete model objects
