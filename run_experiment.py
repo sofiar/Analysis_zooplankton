@@ -180,7 +180,7 @@ model.train(
     val_loader = val_loader
 )
 
-labels, probs, preds = model.predict(test_loader = test_loader)
+labels, probs, preds, logits = model.predict(test_loader = test_loader)
 
 
 # ################################################################################
@@ -213,7 +213,7 @@ if SAVE:
 
     # Save learned weights, predictions and results
     torch.save(model.model.state_dict(), os.path.join(results_directory, 'weights', run_name + '.pth'))
-    torch.save((labels, probs, preds), os.path.join(results_directory, 'predictions', run_name + '.pth'))
+    torch.save((labels, probs, preds, logits), os.path.join(results_directory, 'predictions', run_name + '.pth'))
     torch.save(metadata, os.path.join(results_directory, 'environment', run_name + '.pth'))
 
 # Delete model objects
