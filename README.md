@@ -17,12 +17,11 @@ Note that in some analyses, the less important classes (`Bubbles`, `Floc 1`, `Fl
 * `train.py`: Trains final CNN based on results from development and tuning. Saves model weights and metadata to **final_model/**.
 ### 📚 Notebooks
 * `inference.ipynb`: Notebook to run inference on a single user-supplied image. For new, unlabelled images.
-* `visualize_results_merged.ipynb`: Notebook to explore test performance, using merged 9 classes.
-* `visualize_results.ipynb`: Notebook to explore training metrics and test performance, using all 14 classes.
+* `visualize_train_results.ipynb`: Notebook to explore training metrics and test performance.
 ### 📊 Data & Directories
-* **Data_examples/**: Contains `.tif` images of zooplankton used for inference.
+* **Data_examples/**: Contains labelled `.tif` images of zooplankton used for inference.
 * **final_model/**: Contains final model weights and model metadata.
-* **Inference_results/**: Contains `.png` images of inference results by class and a `.txt` file with overall metrics.
+* **Inference_results/**: Contains `.png` images of inference results by class, for labelled data.
 
 ## ⚙️ Set up
  1. If working on cluster or module system load python in your environment
@@ -73,7 +72,7 @@ pip install git+https://github.com/sofiar/InformedML-CV.git
 ## 🔁 Reproducible Inference Example (for New, Unabelled Image)
 1. Change the `image_path` variable in the first cell of the `inference.ipynb` notebook.
 2. Run all cells.
-3. View the image, the predicted class and the corresponding probability at the end of the notebook.
+3. View the image, the predicted class and the corresponding probability are displayed at the end of the notebook.
    
 
 
