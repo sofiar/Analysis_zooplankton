@@ -13,9 +13,10 @@ Note that in some analyses, the less important classes (`Bubbles`, `Floc 1`, `Fl
 ### 🗄️ Scripts
 * `helper_functions.py`: Contains utility functions for environment set-up and minor data processing
 * `image_dataset.py`: Custom PyTorch `Dataset` to load and process images for training.
-* `inference.py`: Runs inference using trained model weights on images in **Data_examples/** and outputs results to **Inference_results/**.
+* `inference.py`: Runs inference using trained model weights on images in **Data_examples/** and outputs results to **Inference_results/**. For labelled data not included in train or test for the final model.
 * `train.py`: Trains final CNN based on results from development and tuning. Saves model weights and metadata to **final_model/**.
 ### 📚 Notebooks
+* `inference.ipynb`: Notebook to run inference on a single user-supplied image. For new, unlabelled images.
 * `visualize_results_merged.ipynb`: Notebook to explore test performance, using merged 9 classes.
 * `visualize_results.ipynb`: Notebook to explore training metrics and test performance, using all 14 classes.
 ### 📊 Data & Directories
@@ -42,7 +43,7 @@ pip install git+https://github.com/sofiar/InformedML-CV.git
    * `sklearn`
    * `numpy`
 
-## 🔁 Reproducible Inference Example
+## 🔁 Reproducible Inference Example (for Labelled Data)
  1. Ensure the following structure within the **Data_examples/** directory, where the name of each sub-directory MUST match 1 of 14 zooplankton classes listed above.
    ```plaintext
    Data_examples/
@@ -61,15 +62,18 @@ pip install git+https://github.com/sofiar/InformedML-CV.git
  python inference.py
  ```
 
- 3. Explore results in the **Inference_results/** directory. Each `.png` corresponds to 1 of 14 zooplankton classes listed above. The `.txt` file contains metrics for both the original 14 classes and the merged classes.
+ 3. Explore results in the **Inference_results/** directory. Each `.png` corresponds to 1 of 14 zooplankton classes listed above.
    ```plaintext
    Inference_results/
-   ├── metrics.txt
    ├── Calanoid_1.png
    ├── Daphnia.png
    ├── ...
    ```
 
+## 🔁 Reproducible Inference Example (for New, Unabelled Image)
+1. Change the `image_path` variable in the first cell of the `inference.ipynb` notebook.
+2. Run all cells.
+3. View the image, the predicted class and the corresponding probability at the end of the notebook.
    
 
 
