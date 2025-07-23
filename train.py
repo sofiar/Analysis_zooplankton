@@ -1,19 +1,15 @@
 import os
-import torch
-from torchvision import transforms
-
-from helper_functions import set_seed
-
-from image_dataset import ImageDataset
 import time
 from datetime import datetime
-from itertools import product
 
 import torch
-import torchvision.models as models
 from torch.nn import functional as F
+from torchvision import transforms
+import torchvision.models as models
+
 from modular import engine
 
+from image_dataset import ImageDataset
 from helper_functions import set_seed, extract_metrics
 
 
