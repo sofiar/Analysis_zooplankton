@@ -60,7 +60,9 @@ train_sample_weights, train_class_weights = dataset.compute_sample_weights(
     train_split, weights = 'softmax_inverse'
 )
 ```
+
    - Sample dataset based on specified weights in `train_sample_weights`:
+```
 train_loader, val_loader, test_loader = dataset.create_dataloaders(
     batch_size = BATCH_SIZE,
     train_indices = train_split,
@@ -70,10 +72,12 @@ train_loader, val_loader, test_loader = dataset.create_dataloaders(
     train_sample_weights = None OR train_sample_weights
 )
 ```
+
   - Apply a weighted penalty in the loss function by specifying class weights:
 ```
 'loss_fn': {'type': 'CrossEntropyLoss', 'weights': None OR train_class_weights}, 
 ```
+
 5. Run `run_experiment.py`. Make note of the model ID that is printed at the end (e.g., `20250717_184244_densenet121').
 6. Change the value of `run_name` to the model ID in both the `calibration_results.ipynb` and `visualize_train_results.ipynb` notebooks. Run all cells and explore results.
 
