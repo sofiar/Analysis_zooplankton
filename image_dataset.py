@@ -28,6 +28,7 @@ class ImageDataset(Dataset):
         data_subdirectories (list of str, optional): Subdirectories with additional images, each sub-subdirectory should represent a class.
         class_names (list, optional): List of class names to include. If None, all subdirectories are included.
         class_sizes (list, optional): Number of samples to include per class. If None, uses `max_class_size` for all.
+        class_ids (list, optional): Numeric ID for each class (aligned with `class_names`).
         max_class_size (int, optional): Default maximum number of samples to draw per class. Defaults to 10,000.
         image_resolution (int, optional): Final size (height and width) to resize images to. Defaults to 28.
         image_transforms (callable, optional): Image transformations (e.g., data augmentations) to apply. Defaults to None.
@@ -39,15 +40,15 @@ class ImageDataset(Dataset):
         seed (int): Random seed used for sampling.
         class_names (list): Sorted list of class names included in the dataset.
         class_sizes (torch.Tensor): Tensor of the actual sampled size per class.
-        class_indices (list): Numeric index for each class (aligned with `class_names`).
+        class_ids (list): Numeric ID for each class (aligned with `class_names`).
         image_paths (list): List of file paths to all sampled images.
         labels (list): List of numeric class IDs corresponding to each image.
         image_resolution (int): Size to which each image is resized.
         image_transforms (callable or None): Image transformations applied during training or inference.
     """
 
-    def __init__(self, data_directory, data_subdirectories: list = None,
-                 class_names: list = None, class_sizes: list = None, max_class_size: int = 10000, 
+    def __init__(self, data_directory, data_subdirectories: list = None, class_names: list = None, 
+                 class_sizes: list = None, class_ids: list = None, max_class_size: int = 10000, 
                  image_resolution: int = 28, image_transforms = None, seed: int = 666):
         
         self.data_directory = data_directory
@@ -67,15 +68,20 @@ class ImageDataset(Dataset):
         # Specify initial number of samples to consider per class; max if None
         if class_sizes is None:
             class_sizes = [max_class_size] * len(class_names)
+
+        # Specify numeric class ID/index per class; in alphabetical order if None
+        if class_ids is None:
+            class_ids = list(range(len(self.class_names)))
         
-        self.class_names, self.class_sizes = map(list, zip(*sorted(zip(class_names, class_sizes))))
-        self.class_indices = list(range(len(self.class_names)))
+        self.class_names, self.class_sizes, self.class_ids = map(
+            list, zip(*sorted(zip(class_names, class_sizes, class_ids)))
+        )
 
         # Iterate through each class and sample .tif images only; append paths and labels
         self.image_paths = []
         self.labels = []
 
-        for class_id, class_name in zip(self.class_indices, self.class_names):
+        for class_id, class_name in zip(self.class_ids, self.class_names):
 
             # Retrieve all image paths across directories for specified class
             class_paths = []
@@ -90,7 +96,8 @@ class ImageDataset(Dataset):
                     )
 
             # Determine new class size and sample images, only include .tif files
-            new_class_size = min(self.class_sizes[class_id], len(class_paths))
+            class_idx = class_ids.index(class_id)
+            new_class_size = min(self.class_sizes[class_idx], len(class_paths))
 
             random.seed(self.seed)
             sampled_paths = random.sample(class_paths, new_class_size)
@@ -106,7 +113,7 @@ class ImageDataset(Dataset):
                 else:
                     new_class_size -= 1
 
-            self.class_sizes[class_id] = new_class_size
+            self.class_sizes[class_idx] = new_class_size
             self.labels.extend([class_id] * new_class_size)
         
         # Other class initializations
@@ -310,13 +317,16 @@ class ImageDataset(Dataset):
             verbose (bool): Specifies whether to print the resulting image transformation pipeline.
         """
         
-        if not isinstance(image_transforms, transforms.Compose):
-            raise TypeError('Unsupported type: image_transforms must be a torchvision.transforms.Compose object.')
-        
-        if self.image_transforms is None or replace:
-            image_transforms_list = image_transforms.transforms
+        if image_transforms is None:
+            if self.image_transforms is None:
+                image_transforms_list = []
+            else: 
+                image_transforms_list = self.image_transforms.transforms
         else:
-            image_transforms_list = self.image_transforms.transforms + image_transforms.transforms
+            if replace:
+                image_transforms_list = image_transforms.transforms
+            else:
+                image_transforms_list = self.image_transforms.transforms + image_transforms.transforms
 
         image_transforms_cleaned = []
         to_tensor_indices = [i for i, tf in enumerate(image_transforms_list) if isinstance(tf, transforms.ToTensor)]
