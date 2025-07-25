@@ -1,13 +1,12 @@
 # Analysis_zooplankton
 
-This repository contains scripts to train a CNN to classify images of Zooplankton species and notebooks to run inference.
-The dataset was provided by the Ministry of Natural Resources and Forestry (MNR), Government of Ontario.
+This repository contains scripts to train a CNN to classify images of Zooplankton classes and notebooks to run inference. The dataset was provided by the Ministry of Natural Resources and Forestry (MNR), Government of Ontario.
 
-The model is trained to classify the following 14 species:
+The model is trained to classify the following 14 classes:
 
-`Bosmina`, `Bubbles`, `Calanoid_1`, `Chydoridae`, `Chironomid`, `Cyclopoid_1`, `Daphnia`, `Floc_1`, `Floc_2`, `Harpacticoid`, `LargeZ-1`, `Nauploo`, `Sididae`, `TooSmall`
+`Bosmina`, `Bubbles`, `Calanoid`, `Chydoridae`, `Chironomid`, `Cyclopoid`, `Daphnia`, `Floc_1`, `Floc_2`, `Harpacticoid`, `LargeZ-1`, `Nauplii`, `Sididae`, `TooSmall`
 
-Note that in some analyses, the less important classes (`Bubbles`, `Floc 1`, `Floc 2`, `LargeZ-1`, `Nauploo`, `Sididae`, `TooSmall`) are considered as one class: `Other`.
+Note that in some analyses, the secondary classes (`Bubbles`, `Floc 1`, `Floc 2`, `LargeZ-1`, `Nauplii`, `Sididae`, `TooSmall`) are considered as one class: `Other`.
 
 ## 📂 Contents
 ### 🗄️ Scripts
@@ -19,7 +18,7 @@ Note that in some analyses, the less important classes (`Bubbles`, `Floc 1`, `Fl
 * `inference_examples.ipynb`: Runs inference using trained model weights on images in **Data_examples/**. For labelled data not included in train or test for the final model.
 * `visualize_train_results.ipynb`: Notebook to explore training metrics and test performance. Can use the `merge` variable to toggle between original 14 classes and merged 7 classes.
 ### 📊 Data & Directories
-* **Data_examples/**: Contains labelled `.tif` images of zooplankton used for inference.
+* **Data_examples/**: Contains labelled `.tif` example images of zooplankton used for inference.
 * **final_model/**: Contains final model weights and model metadata.
 
 ## ⚙️ Set up
@@ -55,7 +54,7 @@ pip install git+https://github.com/sofiar/InformedML-CV.git
    │   ├── ...
    ```
  2. Run all cells in `inference_examples.ipynb`.
- 3. View plots at the end of the notebook. Each plot corresponds to the true class, while the subtitle above each image corresponds to the predicted class and the class probability.
+ 3. Check plots at the end of the notebook. Each plot corresponds to the true class, while the subtitle above each image corresponds to the predicted class and the class probability.
 
 
 ## 🔁 Reproducible Inference Example (for New, Unabelled Image)
