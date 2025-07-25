@@ -1,6 +1,6 @@
 # Analysis_zooplankton
 
-This repository contains scripts to train and test CNN models to classify zooplankton species.
+This repository contains scripts to train and test CNN models to classify zooplankton classes.
 The dataset was provided by the Ministry of Natural Resources and Forestry(MNR), Government of Ontario.
 
 ## 📂 Contents
