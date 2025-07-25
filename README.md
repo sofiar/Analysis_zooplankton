@@ -1,4 +1,4 @@
-# Analysis_zooplankton
+# Zooplankton classification model
 
 This repository contains scripts to train a CNN to classify images of Zooplankton classes and notebooks to run inference. The dataset was provided by the Ministry of Natural Resources and Forestry (MNR), Government of Ontario.
 
